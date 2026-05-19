@@ -1,7 +1,9 @@
 import React, { useState } from "react";
+import { BellRing, History, ListOrdered, PackageSearch } from "lucide-react";
 import LiveOrder from "./LiveOrder";
 import OrderHistory from "./OrderHistory";
 import { useAuth } from "../../Context/AuthProvider";
+import { AdminHero, AdminPage, AdminPanel, AdminTabs } from "../../Components/AdminPrimitives";
 
 /* 🔔 Sound */
 const playNewOrderSound = () => {
@@ -18,84 +20,58 @@ const OrdersPage = () => {
 
   if (!user) {
     return (
-      <div className="p-6 text-gray-500">
-        Loading user permissions...
-      </div>
+      <AdminPage>
+        <div className="rounded-3xl border border-slate-200 bg-white px-6 py-10 text-center text-slate-500 shadow-sm">
+          Loading user permissions...
+        </div>
+      </AdminPage>
     );
   }
 
   return (
-    <>
-      {/* ================= HEADER ================= */}
-      <header className="bg-white border-b px-6 py-2 flex justify-between items-center">
-        <div>
-          <h1 className="text-xl font-bold">🍔 Orders</h1>
+    <AdminPage>
+      <AdminHero
+        eyebrow="Order Center"
+        title="Orders"
+        description="Monitor live activity, review completed orders, and inspect cancellations from one consistent workspace."
+        icon={PackageSearch}
+        meta={soundEnabled ? "Order alerts enabled" : "Order alerts muted"}
+        action={
+          <button
+            type="button"
+            onClick={() => {
+              setSoundEnabled((prev) => !prev);
+              playNewOrderSound();
+            }}
+            className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition ${
+              soundEnabled
+                ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                : "border-white/15 bg-white/10 text-white hover:bg-white/15"
+            }`}
+          >
+            <BellRing className="h-4 w-4" />
+            Sound {soundEnabled ? "On" : "Off"}
+          </button>
+        }
+      />
 
-          {/* ================= TABS ================= */}
-          <div className="flex gap-3 mt-2">
-            <TabButton
-              active={activeTab === "live"}
-              onClick={() => setActiveTab("live")}
-              label="Live Orders"
-            />
+      <AdminTabs
+        tabs={[
+          { id: "live", label: "Live Orders", icon: PackageSearch },
+          { id: "history", label: "Order History", icon: History },
+          { id: "cancelled", label: "Cancelled", icon: ListOrdered },
+        ]}
+        activeKey={activeTab}
+        onChange={setActiveTab}
+      />
 
-            <TabButton
-              active={activeTab === "history"}
-              onClick={() => setActiveTab("history")}
-              label="Order History"
-            />
-            
-            <TabButton
-              active={activeTab === "cancelled"}
-              onClick={() => setActiveTab("cancelled")}
-              label="Order Cancelled"
-            />
-          </div>
-        </div>
-
-        {/* 🔔 SOUND TOGGLE (OPTIONAL) */}
-        
-        <button
-          onClick={() => {
-            setSoundEnabled((prev) => !prev);
-            playNewOrderSound();
-          }}
-          className={`px-4 py-2 rounded text-sm font-medium ${
-            soundEnabled
-              ? "bg-green-100 text-green-700"
-              : "bg-gray-200 text-gray-700"
-          }`}
-        >
-          🔔 Sound {soundEnabled ? "On" : "Off"}
-        </button>
-       
-      </header>
-
-      {/* ================= CONTENT ================= */}
-      <div className="px-2">
-        {activeTab === "live" && (
-          <LiveOrder soundEnabled={soundEnabled} />
-        )}
-
+      <AdminPanel className="p-2 sm:p-3">
+        {activeTab === "live" && <LiveOrder soundEnabled={soundEnabled} />}
         {activeTab === "history" && <OrderHistory />}
         {activeTab === "cancelled" && <OrderHistory mode="cancelled" />}
-      </div>
-    </>
+      </AdminPanel>
+    </AdminPage>
   );
 };
-
-/* ================= TAB BUTTON ================= */
-const TabButton = ({ active, onClick, label }) => (
-  <button
-    onClick={onClick}
-    className={`px-4 py-1.5 rounded text-sm font-medium transition ${
-      active
-        ? "bg-blue-600 text-white"
-        : "bg-blue-100 text-blue-700 hover:bg-blue-200"
-    }`}
-  >
-    {label}
-  </button>
-);
 
 export default OrdersPage;

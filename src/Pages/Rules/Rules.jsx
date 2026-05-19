@@ -1,50 +1,37 @@
 import React, { useState } from "react";
+import { BadgePercent, Bike, ScrollText } from "lucide-react";
 import CommissionsTsC from "./CommissionsTsC";
 import RestaurantTandC from "./RestaurantTandC";
 import DeliveryFeesRules from "./DeliveryFeesRules";
+import { AdminHero, AdminPage, AdminPanel, AdminTabs } from "../../Components/AdminPrimitives";
 
 const Rules = () => {
   const [activeTab, setActiveTab] = useState("commission");
 
   const tabs = [
-    { id: "commission", label: "Commission", component: <CommissionsTsC /> },
-    { id: "restaurant", label: "Restaurant", component: <RestaurantTandC /> },
-    { id: "delivery", label: "Delivery Fee", component: <DeliveryFeesRules /> },
+    { id: "commission", label: "Commission", icon: BadgePercent, component: <CommissionsTsC /> },
+    { id: "restaurant", label: "Restaurant", icon: ScrollText, component: <RestaurantTandC /> },
+    { id: "delivery", label: "Delivery Fee", icon: Bike, component: <DeliveryFeesRules /> },
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200">
-      {/* NAV - Modern Tab Design */}
-      <div className="px-6 pt-6">
-        <div className="flex border-b border-slate-200">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`
-                relative px-4 py-3 text-sm font-medium transition-colors duration-200
-                ${activeTab === tab.id 
-                  ? "text-blue-600" 
-                  : "text-slate-500 hover:text-slate-700"
-                }
-              `}
-            >
-              {tab.label}
-              {activeTab === tab.id && (
-                <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 rounded-t-full" />
-              )}
-            </button>
-          ))}
-        </div>
-      </div>
+    <AdminPage>
+      <AdminHero
+        eyebrow="Rules Engine"
+        title="Terms & Rules"
+        description="Manage commissions, partner-facing terms, and delivery fee logic with one consistent publishing surface."
+        icon={ScrollText}
+        meta={`${tabs.length} rule groups`}
+      />
 
-      {/* CONTENT */}
-      <div className="p-6">
-        <div className="bg-gradient-to-br from-white to-blue-50/30 rounded-lg p-4 border border-slate-100">
+      <AdminTabs tabs={tabs} activeKey={activeTab} onChange={setActiveTab} />
+
+      <AdminPanel className="p-5">
+        <div className="rounded-2xl border border-slate-100 bg-slate-50 p-4">
           {tabs.find(tab => tab.id === activeTab)?.component}
         </div>
-      </div>
-    </div>
+      </AdminPanel>
+    </AdminPage>
   );
 };
 

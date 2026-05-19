@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { FileText, ShieldCheck, Truck, Undo2 } from "lucide-react";
 
 import { getPolicyDocuments, updatePolicyDocuments } from "../../Api";
+import SectionTabsPanel from "../../Components/SectionTabsPanel";
 
 const APP_LABELS = {
   HUNGZO: "Hungzo Customer App",
@@ -31,6 +32,7 @@ export default function Policies() {
   const [policies, setPolicies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeApp, setActiveApp] = useState("HUNGZO");
 
   useEffect(() => {
     loadPolicies();
@@ -52,6 +54,12 @@ export default function Policies() {
         ...policy,
       }))
     );
+    const apps = [
+      ...new Set((response.policies || []).map((policy) => policy.app || "HUNGZO")),
+    ];
+    if (apps.length > 0) {
+      setActiveApp((current) => (apps.includes(current) ? current : apps[0]));
+    }
     setLoading(false);
   }
 
@@ -73,6 +81,14 @@ export default function Policies() {
       return groups;
     }, {});
   }, [policies]);
+
+  const appGroups = Object.entries(groupedPolicies);
+  const availableApps = appGroups.map(([app]) => app);
+  const resolvedActiveApp = availableApps.includes(activeApp)
+    ? activeApp
+    : availableApps[0] || "HUNGZO";
+  const activePolicies = groupedPolicies[resolvedActiveApp] || [];
+  const ActiveAppIcon = APP_ICONS[resolvedActiveApp] || FileText;
 
   function validatePolicies() {
     for (const policy of policies) {
@@ -161,20 +177,29 @@ export default function Policies() {
         </section>
 
         <form onSubmit={handleSave} className="space-y-6">
-          {Object.entries(groupedPolicies).map(([app, appPolicies]) => {
-            const AppIcon = APP_ICONS[app] || FileText;
-            return (
-              <section
-                key={app}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
+          <SectionTabsPanel
+            eyebrow="Policy Tabs"
+            title="Browse By Audience"
+            helper="Jump between app audiences from the left rail and keep the editing surface focused on one policy group at a time."
+            items={appGroups.map(([app, appPolicies]) => ({
+              key: app,
+              title: APP_LABELS[app] || app,
+              description: "Centralized policy documents grouped by app audience.",
+              icon: APP_ICONS[app] || FileText,
+              meta: `${appPolicies.length} policies`,
+            }))}
+            activeKey={resolvedActiveApp}
+            onChange={setActiveApp}
+          >
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-6 border-b border-slate-100 pb-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-center gap-3">
                   <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
-                    <AppIcon className="h-5 w-5" />
+                    <ActiveAppIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-slate-900">
-                      {APP_LABELS[app] || app}
+                      {APP_LABELS[resolvedActiveApp] || resolvedActiveApp}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
                       Centralized policy documents grouped by app audience.
@@ -182,127 +207,158 @@ export default function Policies() {
                   </div>
                 </div>
 
-                <div className="mt-6 space-y-5">
-                  {appPolicies.map((policy) => {
-                    const index = policies.findIndex((item) => item.key === policy.key);
-                    return (
-                      <div
-                        key={policy.key}
-                        className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
-                      >
-                        <div className="grid gap-5 md:grid-cols-[1.3fr_0.7fr]">
-                          <div className="space-y-5">
-                            <div className="grid gap-5 md:grid-cols-2">
-                              <label className="text-sm font-medium text-slate-700">
-                                Policy key
-                                <input
-                                  value={policy.key}
-                                  onChange={(event) =>
-                                    updatePolicy(index, "key", event.target.value.toUpperCase())
-                                  }
-                                  className={inputClassName}
-                                  disabled={loading || saving}
-                                />
-                              </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Total Policies
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">
+                      {activePolicies.length}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Documents in this tab</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Published
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">
+                      {activePolicies.filter((policy) => policy.published === true).length}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">Live documents visible to apps</p>
+                  </div>
+                </div>
+              </div>
 
-                              <label className="text-sm font-medium text-slate-700">
-                                Title
-                                <input
-                                  value={policy.title}
-                                  onChange={(event) =>
-                                    updatePolicy(index, "title", event.target.value)
-                                  }
-                                  className={inputClassName}
-                                  disabled={loading || saving}
-                                />
-                              </label>
-                            </div>
-
-                            <label className="block text-sm font-medium text-slate-700">
-                              Summary
+              <div className="mt-6 space-y-5">
+                {activePolicies.length === 0 ? (
+                  <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+                    <p className="text-base font-semibold text-slate-900">
+                      No policies in this tab yet
+                    </p>
+                    <p className="mt-2 text-sm text-slate-500">
+                      Once documents are available for this audience, they will appear here for editing.
+                    </p>
+                  </div>
+                ) : null}
+                {activePolicies.map((policy) => {
+                  const index = policies.findIndex((item) => item.key === policy.key);
+                  return (
+                    <div
+                      key={policy.id || `${policy.app}-${policy.key}`}
+                      className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
+                    >
+                      <div className="grid gap-5 md:grid-cols-[1.3fr_0.7fr]">
+                        <div className="space-y-5">
+                          <div className="grid gap-5 md:grid-cols-2">
+                            <label className="text-sm font-medium text-slate-700">
+                              Policy key
                               <input
-                                value={policy.summary}
+                                value={policy.key}
                                 onChange={(event) =>
-                                  updatePolicy(index, "summary", event.target.value)
+                                  updatePolicy(index, "key", event.target.value.toUpperCase())
                                 }
                                 className={inputClassName}
-                                placeholder="Short description shown in admin and API consumers"
                                 disabled={loading || saving}
                               />
                             </label>
 
-                            <label className="block text-sm font-medium text-slate-700">
-                              Content
-                              <textarea
-                                value={policy.content}
+                            <label className="text-sm font-medium text-slate-700">
+                              Title
+                              <input
+                                value={policy.title}
                                 onChange={(event) =>
-                                  updatePolicy(index, "content", event.target.value)
+                                  updatePolicy(index, "title", event.target.value)
                                 }
-                                className={`${inputClassName} min-h-[260px] resize-y`}
-                                placeholder="Write the policy content here. Plain text or markdown-style formatting can be stored."
+                                className={inputClassName}
                                 disabled={loading || saving}
                               />
                             </label>
                           </div>
 
-                          <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5">
-                            <label className="block text-sm font-medium text-slate-700">
-                              App
-                              <select
-                                value={policy.app}
-                                onChange={(event) =>
-                                  updatePolicy(index, "app", event.target.value)
-                                }
-                                className={inputClassName}
-                                disabled={loading || saving}
-                              >
-                                <option value="HUNGZO">Hungzo</option>
-                                <option value="DELIVERY_PARTNER">Delivery Partner</option>
-                                <option value="GLOBAL">Global</option>
-                              </select>
-                            </label>
+                          <label className="block text-sm font-medium text-slate-700">
+                            Summary
+                            <input
+                              value={policy.summary}
+                              onChange={(event) =>
+                                updatePolicy(index, "summary", event.target.value)
+                              }
+                              className={inputClassName}
+                              placeholder="Short description shown in admin and API consumers"
+                              disabled={loading || saving}
+                            />
+                          </label>
 
-                            <label className="block text-sm font-medium text-slate-700">
-                              Sort order
-                              <input
-                                type="number"
-                                value={policy.sortOrder}
-                                onChange={(event) =>
-                                  updatePolicy(index, "sortOrder", event.target.value)
-                                }
-                                className={inputClassName}
-                                disabled={loading || saving}
-                              />
-                            </label>
+                          <label className="block text-sm font-medium text-slate-700">
+                            Content
+                            <textarea
+                              value={policy.content}
+                              onChange={(event) =>
+                                updatePolicy(index, "content", event.target.value)
+                              }
+                              className={`${inputClassName} min-h-[260px] resize-y`}
+                              placeholder="Write the policy content here. Plain text or markdown-style formatting can be stored."
+                              disabled={loading || saving}
+                            />
+                          </label>
+                        </div>
 
-                            <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
-                              Published
-                              <input
-                                type="checkbox"
-                                checked={policy.published === true}
-                                onChange={(event) =>
-                                  updatePolicy(index, "published", event.target.checked)
-                                }
-                                className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
-                                disabled={loading || saving}
-                              />
-                            </label>
+                        <div className="space-y-5 rounded-3xl border border-slate-200 bg-white p-5">
+                          <label className="block text-sm font-medium text-slate-700">
+                            App
+                            <select
+                              value={policy.app}
+                              onChange={(event) =>
+                                updatePolicy(index, "app", event.target.value)
+                              }
+                              className={inputClassName}
+                              disabled={loading || saving}
+                            >
+                              <option value="HUNGZO">Hungzo</option>
+                              <option value="DELIVERY_PARTNER">Delivery Partner</option>
+                              <option value="GLOBAL">Global</option>
+                            </select>
+                          </label>
 
-                            <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">
-                              <p className="font-semibold text-slate-700">Public API</p>
-                              <p className="mt-2 break-all">
-                                {`/store/policies?app=${policy.app}${policy.key ? `&key=${policy.key}` : ""}`}
-                              </p>
-                            </div>
+                          <label className="block text-sm font-medium text-slate-700">
+                            Sort order
+                            <input
+                              type="number"
+                              value={policy.sortOrder}
+                              onChange={(event) =>
+                                updatePolicy(index, "sortOrder", event.target.value)
+                              }
+                              className={inputClassName}
+                              disabled={loading || saving}
+                            />
+                          </label>
+
+                          <label className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700">
+                            Published
+                            <input
+                              type="checkbox"
+                              checked={policy.published === true}
+                              onChange={(event) =>
+                                updatePolicy(index, "published", event.target.checked)
+                              }
+                              className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                              disabled={loading || saving}
+                            />
+                          </label>
+
+                          <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-500">
+                            <p className="font-semibold text-slate-700">Public API</p>
+                            <p className="mt-2 break-all">
+                              {`/store/policies?app=${policy.app}${policy.key ? `&key=${policy.key}` : ""}`}
+                            </p>
                           </div>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </section>
-            );
-          })}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          </SectionTabsPanel>
 
           <div className="flex items-center justify-end gap-3">
             <button

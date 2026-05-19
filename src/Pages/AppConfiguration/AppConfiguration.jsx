@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { Smartphone, Truck } from "lucide-react";
+import { ExternalLink, Smartphone, Truck } from "lucide-react";
 import { getStoreSettings, updateStoreSettings } from "../../Api";
+import SectionTabsPanel from "../../Components/SectionTabsPanel";
 
 const buildInitialForm = () => ({
   hungzo: {
@@ -48,6 +49,7 @@ export default function AppConfiguration() {
   const [form, setForm] = useState(buildInitialForm);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [activeSection, setActiveSection] = useState(APP_SECTIONS[0].key);
 
   useEffect(() => {
     loadSettings();
@@ -135,6 +137,25 @@ export default function AppConfiguration() {
   const fieldClassName =
     "mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100";
 
+  const activeConfigSection =
+    APP_SECTIONS.find((section) => section.key === activeSection) || APP_SECTIONS[0];
+  const activeValues =
+    form[activeConfigSection.key] || buildInitialForm()[activeConfigSection.key];
+  const ActiveSectionIcon = activeConfigSection.icon;
+
+  const sectionTabItems = APP_SECTIONS.map((section) => {
+    const values = form[section.key] || {};
+    const completedFields = [
+      values.termsOfServiceUrl?.trim(),
+      values.privacyPolicyUrl?.trim(),
+    ].filter(Boolean).length;
+
+    return {
+      ...section,
+      meta: `${completedFields}/2 links configured`,
+    };
+  });
+
   return (
     <div className="min-h-full bg-slate-50 px-6 py-6">
       <div className="mx-auto flex w-full max-w-6xl flex-col gap-6">
@@ -156,68 +177,141 @@ export default function AppConfiguration() {
         </section>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {APP_SECTIONS.map((section) => {
-            const Icon = section.icon;
-            const values = form[section.key] || buildInitialForm()[section.key];
-
-            return (
-              <section
-                key={section.key}
-                className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm"
-              >
+          <SectionTabsPanel
+            eyebrow="Configuration Tabs"
+            title="Select App Surface"
+            helper="Switch between app experiences from the left rail and edit only the selected section on the right."
+            items={sectionTabItems}
+            activeKey={activeSection}
+            onChange={setActiveSection}
+          >
+            <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="flex flex-col gap-6 border-b border-slate-100 pb-6 lg:flex-row lg:items-start lg:justify-between">
                 <div className="flex items-start gap-3">
                   <div className="rounded-2xl bg-emerald-50 p-3 text-emerald-700">
-                    <Icon className="h-5 w-5" />
+                    <ActiveSectionIcon className="h-5 w-5" />
                   </div>
                   <div>
                     <h2 className="text-xl font-semibold text-slate-900">
-                      {section.title}
+                      {activeConfigSection.title}
                     </h2>
                     <p className="mt-1 text-sm text-slate-500">
-                      {section.description}
+                      {activeConfigSection.description}
                     </p>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-5 md:grid-cols-2">
-                  <label className="text-sm font-medium text-slate-700">
-                    Terms of Service URL
-                    <input
-                      value={values.termsOfServiceUrl || ""}
-                      onChange={(event) =>
-                        updateField(
-                          section.key,
-                          "termsOfServiceUrl",
-                          event.target.value
-                        )
-                      }
-                      className={fieldClassName}
-                      placeholder="https://example.com/terms"
-                      disabled={loading || saving}
-                    />
-                  </label>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Fields
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-slate-900">2</p>
+                    <p className="mt-1 text-sm text-slate-500">Legal links to maintain</p>
+                  </div>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
+                      Status
+                    </p>
+                    <p className="mt-2 text-sm font-semibold text-slate-900">
+                      {[
+                        activeValues.termsOfServiceUrl?.trim(),
+                        activeValues.privacyPolicyUrl?.trim(),
+                      ].every(Boolean)
+                        ? "Ready"
+                        : "Needs attention"}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Review both URLs before saving
+                    </p>
+                  </div>
+                </div>
+              </div>
 
-                  <label className="text-sm font-medium text-slate-700">
-                    Privacy Policy URL
-                    <input
-                      value={values.privacyPolicyUrl || ""}
-                      onChange={(event) =>
-                        updateField(
-                          section.key,
-                          "privacyPolicyUrl",
-                          event.target.value
-                        )
-                      }
-                      className={fieldClassName}
-                      placeholder="https://example.com/privacy"
-                      disabled={loading || saving}
-                    />
-                  </label>
+              <div className="mt-6 grid gap-5 md:grid-cols-2">
+                <label className="text-sm font-medium text-slate-700">
+                  Terms of Service URL
+                  <input
+                    value={activeValues.termsOfServiceUrl || ""}
+                    onChange={(event) =>
+                      updateField(
+                        activeConfigSection.key,
+                        "termsOfServiceUrl",
+                        event.target.value
+                      )
+                    }
+                    className={fieldClassName}
+                    placeholder="https://example.com/terms"
+                    disabled={loading || saving}
+                  />
+                </label>
+
+                <label className="text-sm font-medium text-slate-700">
+                  Privacy Policy URL
+                  <input
+                    value={activeValues.privacyPolicyUrl || ""}
+                    onChange={(event) =>
+                      updateField(
+                        activeConfigSection.key,
+                        "privacyPolicyUrl",
+                        event.target.value
+                      )
+                    }
+                    className={fieldClassName}
+                    placeholder="https://example.com/privacy"
+                    disabled={loading || saving}
+                  />
+                </label>
+              </div>
+
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">Preview links</p>
+                  <div className="mt-4 space-y-3">
+                    {[
+                      {
+                        label: "Terms of Service",
+                        value: activeValues.termsOfServiceUrl,
+                      },
+                      {
+                        label: "Privacy Policy",
+                        value: activeValues.privacyPolicyUrl,
+                      },
+                    ].map((item) => (
+                      <div
+                        key={item.label}
+                        className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-900">{item.label}</p>
+                          <p className="truncate text-sm text-slate-500">
+                            {item.value?.trim() || "No link added yet"}
+                          </p>
+                        </div>
+                        {item.value?.trim() ? (
+                          <a
+                            href={item.value.trim()}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition hover:border-emerald-200 hover:text-emerald-700"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
-              </section>
-            );
-          })}
+                <div className="rounded-3xl border border-slate-200 bg-gradient-to-br from-emerald-50 via-white to-slate-50 p-5">
+                  <p className="text-sm font-semibold text-slate-900">Admin tip</p>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    Use fully qualified `https://` links so the apps can deep-link users directly from the login consent area without broken redirects.
+                  </p>
+                </div>
+              </div>
+            </section>
+          </SectionTabsPanel>
 
           <div className="flex items-center justify-end gap-3">
             <button
