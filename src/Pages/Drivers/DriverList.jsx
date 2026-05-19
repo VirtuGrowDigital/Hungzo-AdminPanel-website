@@ -1,9 +1,53 @@
 import React, { useEffect, useState } from "react";
-import { DriverApproved as getApprovedDrivers, fetchDriverReviewsAdmin } from "../../Api";
-import { User, CheckCircle, Search, Download, Eye, Phone, Car, Bike, X, MapPin, IdCard, Calendar, Activity, Truck, FileText, Mail, Award, Clock, Navigation, ShieldCheck, Wifi, Maximize2, MoveUpRightIcon, Star } from "lucide-react";
+import {
+  DriverApproved as getApprovedDrivers,
+  blockDriverReq,
+  fetchDriverRestrictionHistory,
+  fetchDriverReviewsAdmin,
+  unblockDriverReq,
+} from "../../Api";
+import { User, CheckCircle, Search, Download, Eye, Phone, Car, Bike, X, MapPin, IdCard, Calendar, Activity, Truck, FileText, Award, Clock, Navigation, ShieldCheck, Wifi, Maximize2, MoveUpRightIcon, Star, AlertTriangle } from "lucide-react";
 import toast from "react-hot-toast";
 import { Link } from "react-router-dom";
-import { useAuth } from "../../Context/AuthProvider";
+
+const DRIVER_BLOCK_REASON_OPTIONS = [
+  { value: "FRAUD", label: "Fraud" },
+  { value: "ABUSIVE_BEHAVIOR", label: "Abusive behavior" },
+  { value: "FAKE_DELIVERY", label: "Fake delivery" },
+  { value: "COMPLIANCE_FAILURE", label: "Compliance failure" },
+  { value: "DOCUMENT_MISMATCH", label: "Document mismatch" },
+  { value: "LOW_QUALITY_SERVICE", label: "Low quality service" },
+  { value: "OTHER", label: "Other" },
+];
+
+const getRestrictionBadge = (driver) => {
+  const status = driver?.restriction?.accountStatus || driver?.accountStatus || "ACTIVE";
+
+  if (status === "BLOCKED_PERMANENT") {
+    return {
+      label: "Blocked permanently",
+      className: "bg-red-100 text-red-700",
+    };
+  }
+
+  if (status === "BLOCKED_TEMPORARY") {
+    return {
+      label: "Blocked temporarily",
+      className: "bg-amber-100 text-amber-700",
+    };
+  }
+
+  return {
+    label: "Approved",
+    className: "bg-green-100 text-green-700",
+  };
+};
+
+const formatRestrictionDate = (value) => {
+  if (!value) return "—";
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? "—" : parsed.toLocaleString("en-IN");
+};
 
 const DriverList = () => {
   const [drivers, setDrivers] = useState([]);
@@ -12,7 +56,9 @@ const DriverList = () => {
   const [search, setSearch] = useState("");
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverReviews, setSelectedDriverReviews] = useState([]);
+  const [selectedDriverRestrictionHistory, setSelectedDriverRestrictionHistory] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [restrictionHistoryLoading, setRestrictionHistoryLoading] = useState(false);
 
   /* ================= FETCH ================= */
   const fetchDrivers = async () => {
@@ -66,14 +112,63 @@ const DriverList = () => {
   const openDriverDetails = async (driver) => {
     setSelectedDriver(driver);
     setSelectedDriverReviews([]);
+    setSelectedDriverRestrictionHistory([]);
     setReviewsLoading(true);
+    setRestrictionHistoryLoading(true);
     const response = await fetchDriverReviewsAdmin(driver._id);
     if (response?.ok) {
       setSelectedDriverReviews(response.data?.reviews || []);
     } else {
       toast.error(response?.message || "Failed to load driver ratings");
     }
+    const historyResponse = await fetchDriverRestrictionHistory(driver._id);
+    if (historyResponse?.ok) {
+      setSelectedDriverRestrictionHistory(historyResponse.data?.history || []);
+    } else {
+      toast.error(historyResponse?.message || "Failed to load restriction history");
+    }
     setReviewsLoading(false);
+    setRestrictionHistoryLoading(false);
+  };
+
+  const refreshDrivers = async () => {
+    const res = await getApprovedDrivers();
+    setDrivers(res || []);
+    setFilteredDrivers(res || []);
+  };
+
+  const handleBlockDriver = async (driverId, payload) => {
+    const response = await blockDriverReq(driverId, payload);
+    if (response?.success) {
+      toast.success(response.message || "Driver blocked");
+      await refreshDrivers();
+      const updatedDriver =
+        (drivers || []).find((driver) => driver._id === driverId) || selectedDriver;
+      if (updatedDriver?._id === driverId) {
+        await openDriverDetails({ ...updatedDriver, ...response.driver, restriction: response.restriction });
+      }
+      return { ok: true };
+    }
+
+    toast.error(response?.message || "Failed to block driver");
+    return { ok: false };
+  };
+
+  const handleUnblockDriver = async (driverId, payload) => {
+    const response = await unblockDriverReq(driverId, payload);
+    if (response?.success) {
+      toast.success(response.message || "Driver unblocked");
+      await refreshDrivers();
+      const updatedDriver =
+        (drivers || []).find((driver) => driver._id === driverId) || selectedDriver;
+      if (updatedDriver?._id === driverId) {
+        await openDriverDetails({ ...updatedDriver, ...response.driver, restriction: response.restriction });
+      }
+      return { ok: true };
+    }
+
+    toast.error(response?.message || "Failed to unblock driver");
+    return { ok: false };
   };
 
 
@@ -206,9 +301,9 @@ const DriverList = () => {
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium ${getRestrictionBadge(driver).className}`}>
                         <CheckCircle className="w-3.5 h-3.5" />
-                        Approved
+                        {getRestrictionBadge(driver).label}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -256,9 +351,13 @@ const DriverList = () => {
         <DriverDetailsModal
           driver={selectedDriver}
           reviews={selectedDriverReviews}
+          restrictionHistory={selectedDriverRestrictionHistory}
+          restrictionHistoryLoading={restrictionHistoryLoading}
           reviewsLoading={reviewsLoading}
+          onBlockDriver={handleBlockDriver}
           onClose={() => setSelectedDriver(null)}
           onContact={handleContact}
+          onUnblockDriver={handleUnblockDriver}
         />
       )}
     </div>
@@ -266,9 +365,60 @@ const DriverList = () => {
 };
 
 /* ================= MODAL COMPONENT ================= */
-const DriverDetailsModal = ({ driver, reviews, reviewsLoading, onClose, onContact }) => {
+const DriverDetailsModal = ({
+  driver,
+  reviews,
+  reviewsLoading,
+  restrictionHistory,
+  restrictionHistoryLoading,
+  onBlockDriver,
+  onClose,
+  onContact,
+  onUnblockDriver,
+}) => {
   const [selectedImage, setSelectedImage] = useState(null);
-  const { logout  } = useAuth();
+  const [blockType, setBlockType] = useState("TEMPORARY");
+  const [reasonCode, setReasonCode] = useState("OTHER");
+  const [reasonText, setReasonText] = useState("");
+  const [blockedUntil, setBlockedUntil] = useState("");
+  const [actionLoading, setActionLoading] = useState(false);
+  const restriction = driver?.restriction || {};
+  const isBlocked = restriction?.isBlocked === true;
+  const badge = getRestrictionBadge(driver);
+
+  const submitBlock = async () => {
+    if (!reasonText.trim()) {
+      toast.error("Restriction note is required");
+      return;
+    }
+
+    if (blockType === "TEMPORARY" && !blockedUntil) {
+      toast.error("Temporary block requires an end date");
+      return;
+    }
+
+    setActionLoading(true);
+    const result = await onBlockDriver(driver._id, {
+      blockType,
+      reasonCode,
+      reasonText,
+      blockedUntil: blockType === "TEMPORARY" ? blockedUntil : null,
+    });
+    if (result?.ok) {
+      setReasonText("");
+      setBlockedUntil("");
+    }
+    setActionLoading(false);
+  };
+
+  const submitUnblock = async () => {
+    setActionLoading(true);
+    await onUnblockDriver(driver._id, {
+      reasonText: reasonText.trim(),
+    });
+    setActionLoading(false);
+  };
+
   return (
     <>
       <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4 backdrop-blur-sm" onClick={onClose}>
@@ -373,9 +523,9 @@ const DriverDetailsModal = ({ driver, reviews, reviewsLoading, onClose, onContac
               <div>
                 <h3 className="text-2xl font-bold text-gray-900">{driver.user?.name}</h3>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="flex items-center gap-1 text-sm bg-green-100 text-green-700 px-3 py-1 rounded-full">
+                  <span className={`flex items-center gap-1 text-sm px-3 py-1 rounded-full ${badge.className}`}>
                     <CheckCircle className="w-4 h-4" />
-                    Approved Driver
+                    {badge.label}
                   </span>
                   {driver.isActive && (
                     <span className="flex items-center gap-1 text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full">
@@ -464,13 +614,13 @@ const DriverDetailsModal = ({ driver, reviews, reviewsLoading, onClose, onContac
                     </div>
                   </div>
                   <div className="bg-gray-50 rounded-xl p-5">
-                    <h4 className="text-sm font-medium text-gray-500 mb-2">Temporary block</h4>
+                    <h4 className="text-sm font-medium text-gray-500 mb-2">Restriction status</h4>
+                    <div className="space-y-2 text-sm text-gray-700">
+                      <p>Account status: <span className="font-semibold">{restriction.accountStatus || "ACTIVE"}</span></p>
+                      <p>Reason code: <span className="font-semibold">{restriction.reasonCode || "—"}</span></p>
+                      <p>Blocked until: <span className="font-semibold">{formatRestrictionDate(restriction.blockedUntil)}</span></p>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => {logout(); toast.error("Driver Blocked");}}
-                    className=" w-full bg-red-500 hover:bg-red-600 text-white py-2 px-4 rounded">
-                    Block Driver
-                  </button>
                 </div>
               )}
 
@@ -508,6 +658,119 @@ const DriverDetailsModal = ({ driver, reviews, reviewsLoading, onClose, onContac
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-8 rounded-2xl border border-gray-200 bg-gray-50 p-5">
+              <div className="flex items-center gap-2 text-lg font-semibold text-gray-800">
+                <AlertTriangle className="w-5 h-5 text-red-500" />
+                Driver Restrictions
+              </div>
+              <p className="mt-2 text-sm text-gray-500">
+                Blocking immediately forces the driver offline and prevents new delivery assignments.
+              </p>
+
+              <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium text-gray-700">Block type</span>
+                  <select
+                    value={blockType}
+                    onChange={(event) => setBlockType(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    disabled={actionLoading || isBlocked}
+                  >
+                    <option value="TEMPORARY">Temporary</option>
+                    <option value="PERMANENT">Permanent</option>
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm">
+                  <span className="font-medium text-gray-700">Reason code</span>
+                  <select
+                    value={reasonCode}
+                    onChange={(event) => setReasonCode(event.target.value)}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    disabled={actionLoading || isBlocked}
+                  >
+                    {DRIVER_BLOCK_REASON_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="space-y-2 text-sm lg:col-span-2">
+                  <span className="font-medium text-gray-700">Internal note</span>
+                  <textarea
+                    value={reasonText}
+                    onChange={(event) => setReasonText(event.target.value)}
+                    rows={3}
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                    placeholder="Explain why this driver is being restricted."
+                    disabled={actionLoading}
+                  />
+                </label>
+
+                {blockType === "TEMPORARY" ? (
+                  <label className="space-y-2 text-sm">
+                    <span className="font-medium text-gray-700">Unblock date</span>
+                    <input
+                      type="datetime-local"
+                      value={blockedUntil}
+                      onChange={(event) => setBlockedUntil(event.target.value)}
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
+                      disabled={actionLoading || isBlocked}
+                    />
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-3">
+                <button
+                  onClick={submitBlock}
+                  disabled={actionLoading || isBlocked}
+                  className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {actionLoading && !isBlocked ? "Saving..." : "Block driver"}
+                </button>
+                <button
+                  onClick={submitUnblock}
+                  disabled={actionLoading || !isBlocked}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {actionLoading && isBlocked ? "Saving..." : "Unblock driver"}
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <h5 className="text-sm font-semibold text-gray-700">Restriction history</h5>
+                {restrictionHistoryLoading ? (
+                  <div className="mt-3 rounded-xl bg-white px-4 py-5 text-sm text-gray-500">
+                    Loading restriction history...
+                  </div>
+                ) : restrictionHistory.length === 0 ? (
+                  <div className="mt-3 rounded-xl bg-white px-4 py-5 text-sm text-gray-500">
+                    No restriction actions recorded for this driver.
+                  </div>
+                ) : (
+                  <div className="mt-3 space-y-3">
+                    {restrictionHistory.map((entry) => (
+                      <div key={entry._id} className="rounded-xl bg-white p-4 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div className="text-sm font-semibold text-gray-900">{entry.action}</div>
+                          <div className="text-xs text-gray-400">{formatRestrictionDate(entry.createdAt)}</div>
+                        </div>
+                        <div className="mt-2 text-sm text-gray-600">
+                          Reason: {entry.reasonCode || "—"} {entry.reasonText ? `• ${entry.reasonText}` : ""}
+                        </div>
+                        <div className="mt-1 text-xs text-gray-500">
+                          By: {entry.actedByAdmin?.username || entry.actedByAdmin?.email || "System"}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

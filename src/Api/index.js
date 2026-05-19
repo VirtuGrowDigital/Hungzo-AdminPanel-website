@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // const API_BASE = "https://api.hungzo.in";
-const API_BASE = "http://192.168.0.196:4000";
+const API_BASE = "http://10.66.210.138:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
 
 
@@ -527,6 +527,45 @@ export async function rejectDriverReq(id) {
       ok: false,
       message:
         error.response?.data?.message || "Failed to reject driver",
+    };
+  }
+}
+
+export async function blockDriverReq(id, payload) {
+  try {
+    const res = await API.post(`/admin/drivers/${id}/block`, payload);
+    return res.data;
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error.response?.data?.message || "Failed to block driver",
+    };
+  }
+}
+
+export async function unblockDriverReq(id, payload = {}) {
+  try {
+    const res = await API.post(`/admin/drivers/${id}/unblock`, payload);
+    return res.data;
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error.response?.data?.message || "Failed to unblock driver",
+    };
+  }
+}
+
+export async function fetchDriverRestrictionHistory(driverId) {
+  try {
+    const res = await API.get(`/admin/dashboard/drivers/${driverId}/restrictions`);
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error.response?.data?.message || "Failed to fetch restriction history",
     };
   }
 }
