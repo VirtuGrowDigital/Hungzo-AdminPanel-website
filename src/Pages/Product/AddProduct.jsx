@@ -21,7 +21,11 @@ import {
   bulkImportProducts,
 } from "../../Api";
 
+const createVarietyId = () =>
+  `variety-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
 const createEmptyVariety = () => ({
+  id: createVarietyId(),
   name: "",
   originalPrice: "",
   discountedPrice: "",
@@ -178,6 +182,7 @@ const extractBulkVarieties = (row) => {
         variety.discountedPrice !== ""
     )
     .map((variety) => ({
+      id: createVarietyId(),
       name: variety.name,
       originalPrice: Number(variety.originalPrice),
       discountedPrice: Number(variety.discountedPrice),
@@ -751,7 +756,7 @@ export default function AddProductPage() {
           <div className="space-y-3">
             {varieties.map((variety, index) => (
               <div
-                key={`${index}-${variety.name}`}
+                key={variety.id}
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
               >
                 <div className="mb-3 flex items-center justify-between">
