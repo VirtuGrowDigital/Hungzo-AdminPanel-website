@@ -1,7 +1,7 @@
 import axios from "axios";
 
-const API_BASE = "https://api.hungzo.in";
-// const API_BASE = "http://10.66.210.138:4000";
+// const API_BASE = "https://api.hungzo.in";
+const API_BASE = "http://172.29.101.220:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
 
 
@@ -144,6 +144,20 @@ export async function restaurantOnlyLogged() {
       message:
         error.response?.data?.message ||
         "Failed to fetch restaurant list",
+    };
+  }
+}
+
+export async function getUserProfiles() {
+  try {
+    const res = await API.get("/admin/dashboard/users/profiles");
+    return res.data;
+  } catch (error) {
+    return {
+      ok: false,
+      success: false,
+      message:
+        error.response?.data?.message || "Failed to fetch user profiles",
     };
   }
 }

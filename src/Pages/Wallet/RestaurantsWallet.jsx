@@ -43,6 +43,7 @@ const RestaurantsWallet = () => {
     const [actionLoading, setActionLoading] = useState(false);
     const [actionType, setActionType] = useState('credit');
     const [currentBalance, setCurrentBalance] = useState(0);
+    const [userProfile, setUserProfile] = useState(null);
 
     // Fetch transactions
     const fetchTransactions = async (page = 1, limit = 20) => {
@@ -62,11 +63,16 @@ const RestaurantsWallet = () => {
                 // setTransactions(result.data.transactions || result.data.data || []);
                 const txns = result.data.transactions || result.data.data || [];
                 setTransactions(txns);
+                setUserProfile(result.data.user || null);
 
                 // SET BALANCE FROM LATEST TRANSACTION
-                if (txns.length > 0) {
+                if (result.data.wallet?.balance !== undefined) {
+                    setCurrentBalance(result.data.wallet.balance || 0);
+                } else if (txns.length > 0) {
                     const latest = txns[0];
                     setCurrentBalance(latest.closingBalance || latest.currentBalance || 0);
+                } else {
+                    setCurrentBalance(0);
                 }
 
                 // Update pagination info
@@ -345,6 +351,16 @@ const RestaurantsWallet = () => {
                         <div>
                             <h1 className="text-3xl font-bold text-gray-900">User Wallet</h1>
                             <p className="text-gray-600 mt-2">Transaction history and wallet management</p>
+                            {userProfile && (
+                                <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-gray-600">
+                                    <span className="rounded-full bg-blue-50 px-3 py-1 font-medium text-blue-700">
+                                        {userProfile.name?.trim() || 'Unnamed user'}
+                                    </span>
+                                    <span className="rounded-full bg-emerald-50 px-3 py-1 font-medium text-emerald-700">
+                                        {userProfile.phone?.trim() || 'No phone'}
+                                    </span>
+                                </div>
+                            )}
                             <div className="flex items-center gap-2 mt-1">
                                 <span className="text-sm text-gray-500">User ID:</span>
                                 <code className="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm font-mono">

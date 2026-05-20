@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  restaurantOnlyLogged,
+  getUserProfiles,
 } from "../../Api";
 import { Eye, Store, Wallet, X } from "lucide-react";
 import toast from "react-hot-toast";
@@ -9,48 +9,37 @@ import { useAuth } from "../../Context/AuthProvider";
 import { AdminHero, AdminPage, AdminPanel, AdminSearchField } from "../../Components/AdminPrimitives";
 
 const Restaurant = () => {
-  const [restaurants, setRestaurants] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedRestaurant, setSelectedRestaurant] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "SUPERADMIN";
 
   // ================= FETCH =================
-  const fetchLoggedRestaurants = async () => {
+  const fetchUserProfiles = async () => {
     try {
-      const res = await restaurantOnlyLogged();
-
+      const res = await getUserProfiles();
       const data = res?.users || res?.data?.users || [];
-
-      //  Only RESTAURANT role
-      const onlyRestaurants = data.filter(
-        (user) => user.role === "RESTAURANT"
-      );
-
-      //  Sort latest first
-      const sorted = [...onlyRestaurants].sort(
-        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-      );
-
-      setRestaurants(sorted);
+      setUsers(data);
     } catch {
-      toast.error("Failed to load logged users");
+      toast.error("Failed to load user profiles");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchLoggedRestaurants();
+    fetchUserProfiles();
   }, []);
 
 
   // ================= SEARCH =================
-  const filteredRestaurants = restaurants.filter((user) =>
+  const filteredUsers = users.filter((user) =>
     (user.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (user.phone || "").includes(searchTerm)
+    (user.phone || "").includes(searchTerm) ||
+    (user.email || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   if (loading) {
@@ -71,15 +60,15 @@ const Restaurant = () => {
       <AdminHero
         eyebrow="User Directory"
         title="Users"
-        description="Review logged-in restaurant accounts, open wallet details, and jump into user orders from one clean directory."
+        description="Review production user profiles, open wallet details, and jump into customer orders from one clean directory."
         icon={Store}
-        meta={`${restaurants.length} users`}
+        meta={`${users.length} users`}
       />
 
       <AdminSearchField
         value={searchTerm}
         onChange={(e) => setSearchTerm(e.target.value)}
-        placeholder="Search by name or phone..."
+        placeholder="Search by name, phone, or email..."
       />
 
       <AdminPanel className="h-[70vh] overflow-y-auto">
@@ -97,34 +86,34 @@ const Restaurant = () => {
           </thead>
 
           <tbody className="divide-y divide-slate-100">
-            {filteredRestaurants.length > 0 ? (
-              filteredRestaurants.map((res, index) => (
+            {filteredUsers.length > 0 ? (
+              filteredUsers.map((userProfile, index) => (
                 <tr
-                  key={res._id}
+                  key={userProfile._id}
                   className={`transition-colors hover:bg-slate-50 ${
                     index % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                   }`}
                 >
                   <td className="px-6 py-4 font-medium text-slate-900">
-                    {res.name || "—"}
+                    {userProfile.name || "—"}
                   </td>
 
                   <td className="px-6 py-4 text-slate-600">
-                    {res.email || "—"}
+                    {userProfile.email || "—"}
                   </td>
 
                   <td className="px-6 py-4 text-slate-600">
-                    {res.phone || "—"}
+                    {userProfile.phone || "—"}
                   </td>
 
                   <td className="px-6 py-4 text-slate-600">
-                    {new Date(res.createdAt).toLocaleDateString("en-IN")}
+                    {new Date(userProfile.createdAt).toLocaleDateString("en-IN")}
                   </td>
 
                   {/* Details */}
                   <td className="px-6 py-4 text-center">
                     <button
-                      onClick={() => setSelectedRestaurant(res)}
+                      onClick={() => setSelectedUser(userProfile)}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-700 transition hover:bg-slate-200"
                     >
                       <Eye size={18} />
@@ -134,7 +123,7 @@ const Restaurant = () => {
                   {/* Wallet */}
                   <td className="px-6 py-4 text-center">
                     <Link
-                      to={`/wallet/${res._id}`}
+                      to={`/wallet/${userProfile._id}`}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 transition hover:bg-emerald-200"
                     >
                       <Wallet size={18} />
@@ -143,7 +132,7 @@ const Restaurant = () => {
                   {/* Orders */}
                   <td className="px-6 py-4 text-center">
                     <Link
-                      to={`/orders/user/${res._id}`}
+                      to={`/orders/user/${userProfile._id}`}
                       className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-white transition hover:bg-slate-700"
                       title="View Orders"
                     >
@@ -169,33 +158,34 @@ const Restaurant = () => {
       </AdminPanel>
 
       {/* ================= MODAL ================= */}
-      {selectedRestaurant && (
+      {selectedUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="relative w-full max-w-lg rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-2xl">
             <button
-              onClick={() => setSelectedRestaurant(null)}
+              onClick={() => setSelectedUser(null)}
               className="absolute right-4 top-4 rounded-full p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
             >
               <X size={20} />
             </button>
 
             <h2 className="mb-4 text-2xl font-semibold text-slate-900">
-              {selectedRestaurant.name || "User"}
+              {selectedUser.name || "User"}
             </h2>
 
             <div className="space-y-3 text-sm text-slate-600">
-              <p><span className="font-semibold text-slate-900">Email:</span> {selectedRestaurant.email || "—"}</p>
-              <p><span className="font-semibold text-slate-900">Phone:</span> {selectedRestaurant.phone || "—"}</p>
-              <p><span className="font-semibold text-slate-900">Role:</span> {selectedRestaurant.role}</p>
+              <p><span className="font-semibold text-slate-900">Email:</span> {selectedUser.email || "—"}</p>
+              <p><span className="font-semibold text-slate-900">Phone:</span> {selectedUser.phone || "—"}</p>
+              <p><span className="font-semibold text-slate-900">Role:</span> {selectedUser.role}</p>
+              <p><span className="font-semibold text-slate-900">Status:</span> {selectedUser.accountStatus || "ACTIVE"}</p>
               <p>
                 <span className="font-semibold text-slate-900">Created At:</span>{" "}
-                {new Date(selectedRestaurant.createdAt).toLocaleString("en-IN")}
+                {new Date(selectedUser.createdAt).toLocaleString("en-IN")}
               </p>
             </div>
 
             <div className="flex justify-end mt-6">
               <Link
-                to={`/wallet/${selectedRestaurant._id}`}
+                to={`/wallet/${selectedUser._id}`}
                 className="rounded-full bg-emerald-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-700"
               >
                 View Wallet

@@ -34,6 +34,7 @@ const adminMenu = [
     label: "Users",
     icon: BuildingOffice2Icon,
     children: [
+      { to: "/users/profiles", label: "Profiles", icon: BuildingOffice2Icon },
       {
         to: "/users/deletion-requests",
         label: "Deletion Requests",
