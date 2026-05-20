@@ -117,7 +117,7 @@ export async function AdminList() {
 // ================= RESTAURANT ==================
 
 
-// ================= RESTAURANTLIST ================
+// ================= RESTAURANTLIST =================
 
 export async function restaurantprofile() {
   try {
