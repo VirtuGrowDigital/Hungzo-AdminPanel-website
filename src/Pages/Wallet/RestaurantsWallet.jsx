@@ -45,6 +45,14 @@ const RestaurantsWallet = () => {
     const [currentBalance, setCurrentBalance] = useState(0);
     const [userProfile, setUserProfile] = useState(null);
 
+    const formatAmountForToast = (value) =>
+        new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        }).format(Number(value) || 0);
+
     // Fetch transactions
     const fetchTransactions = async (page = 1, limit = 20) => {
         if (!userId) {
@@ -138,8 +146,13 @@ const RestaurantsWallet = () => {
         }
     
         if (res?.ok) {
-            //  NEVER undefined now
-            toast.success(res.message || `Wallet ${actionType} successful`);
+            const userLabel = userProfile?.name || userProfile?.phone || 'customer';
+            const fallbackMessage =
+                actionType === 'credit'
+                    ? `${formatAmountForToast(amount)} credited to ${userLabel}'s wallet`
+                    : `${formatAmountForToast(amount)} debited from ${userLabel}'s wallet`;
+
+            toast.success(res.data?.message || fallbackMessage);
     
             //  Update balance instantly
             if (res.data?.balance !== undefined) {

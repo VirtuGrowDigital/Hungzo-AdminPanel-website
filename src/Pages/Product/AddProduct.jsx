@@ -47,7 +47,7 @@ const createInitialForm = () => ({
   stockQuantity: "0",
   minOrderQuantity: "1",
   shelfLifeDays: "0",
-  storageType: "ambient",
+  storageType: "",
   isFeatured: false,
   isBestseller: false,
   seedRatingAverage: "0",
@@ -71,6 +71,89 @@ const unitOptions = [
   "jars",
   "bottles",
   "cans",
+];
+const unitAliasMap = new Map([
+  ["kg", "kg"],
+  ["kgs", "kg"],
+  ["kilogram", "kg"],
+  ["kilograms", "kg"],
+  ["kilo", "kg"],
+  ["kilos", "kg"],
+  ["g", "g"],
+  ["gm", "g"],
+  ["gms", "g"],
+  ["gram", "g"],
+  ["grams", "g"],
+  ["l", "l"],
+  ["lt", "l"],
+  ["ltr", "l"],
+  ["ltrs", "l"],
+  ["liter", "l"],
+  ["liters", "l"],
+  ["litre", "l"],
+  ["litres", "l"],
+  ["ml", "ml"],
+  ["mls", "ml"],
+  ["milliliter", "ml"],
+  ["milliliters", "ml"],
+  ["millilitre", "ml"],
+  ["millilitres", "ml"],
+  ["pcs", "pcs"],
+  ["pc", "pcs"],
+  ["piece", "pcs"],
+  ["pieces", "pcs"],
+  ["unit", "pcs"],
+  ["units", "pcs"],
+  ["packs", "packs"],
+  ["pack", "packs"],
+  ["packet", "packs"],
+  ["packets", "packs"],
+  ["boxes", "boxes"],
+  ["box", "boxes"],
+  ["jars", "jars"],
+  ["jar", "jars"],
+  ["bottles", "bottles"],
+  ["bottle", "bottles"],
+  ["cans", "cans"],
+  ["can", "cans"],
+]);
+const bulkImportFieldDocs = [
+  ["name", "Yes", "Display name shown in catalog", "Mozzarella Cheese Block"],
+  ["brand", "Yes", "Brand or manufacturer name", "Amul"],
+  ["sku", "Yes", "Unique code, 3-40 chars using A-Z, 0-9, _ or -", "CHEESE-001"],
+  ["category", "Yes", "Category name to match or auto-create", "DAIRY"],
+  ["unit", "Yes", "Stored as kg, g, l, ml, pcs, packs, boxes, jars, bottles, cans", "KG"],
+  ["packSizeLabel", "No", "Customer-facing pack label, can be left blank", "1 kg block"],
+  ["minOrderQuantity", "Yes", "Minimum order quantity, at least 1", "2"],
+  ["stockQuantity", "Yes", "Numeric stock available", "120"],
+  ["storageType", "No", "ambient, dry, chilled, or frozen; defaults to ambient when blank", "chilled"],
+  ["status", "Yes", "available or not available", "available"],
+  ["variety1_name", "Yes", "At least one variety is required", "1 kg block"],
+  ["variety1_originalPrice", "Yes", "Original MRP/list price", "420"],
+  ["variety1_discountedPrice", "Yes", "Selling price", "385"],
+  ["variety1_isAvailable", "No", "Defaults to true when blank", "true"],
+  ["primaryImage", "No", "Public http/https URL", "https://example.com/main.jpg"],
+  ["images", "No", "Multiple public URLs separated by comma, pipe, or new line", "https://example.com/1.jpg,https://example.com/2.jpg"],
+  ["badges", "No", "Comma-separated badges, max 6", "Pizza essential,High melt"],
+];
+const bulkImportRules = [
+  "Run Preview import before Import products so category, SKU, image, and variety checks happen first.",
+  "Only the first worksheet is imported from Excel files.",
+  "Duplicate SKUs inside the same file are rejected, and existing SKUs cannot be re-imported.",
+  "If Auto-create missing categories is off, unmatched categories fail preview/import.",
+  "Missing images fall back to the default product image automatically.",
+];
+const bulkUnitExamples = [
+  "KG, kgs, kilogram, kilo -> kg",
+  "gram, gm, gms -> g",
+  "liter, litre, ltr -> l",
+  "milliliter, millilitre, mls -> ml",
+  "pc, piece, pieces, unit, units -> pcs",
+  "pack, packet -> packs",
+  "box -> boxes",
+  "jar -> jars",
+  "bottle -> bottles",
+  "can -> cans",
 ];
 const storageOptions = [
   { value: "ambient", label: "Ambient" },
@@ -137,6 +220,27 @@ const parseDelimitedString = (value) =>
     .map((item) => item.trim())
     .filter(Boolean) ?? [];
 
+const normalizeUnitValue = (value, fallback = "pcs") => {
+  if (value === undefined || value === null) return fallback;
+
+  const normalized = value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replace(/\./g, "")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) return fallback;
+  return unitAliasMap.get(normalized) ?? normalized;
+};
+
+const normalizeStorageTypeValue = (value, fallback = "ambient") => {
+  if (value === undefined || value === null) return fallback;
+
+  const normalized = value.toString().trim().toLowerCase();
+  return normalized || fallback;
+};
+
 const getUploadReference = (index) => `${UPLOAD_REFERENCE_PREFIX}${index}__`;
 
 const moveItem = (items, fromIndex, toIndex) => {
@@ -201,13 +305,13 @@ const normalizeBulkRow = (row) => {
     upc: row.upc?.toString().trim() ?? "",
     hsnCode: row.hsnCode?.toString().trim() ?? "",
     category: row.category?.toString().trim() ?? "",
-    unit: row.unit?.toString().trim() ?? "pcs",
+    unit: normalizeUnitValue(row.unit, "pcs"),
     packSizeLabel: row.packSizeLabel?.toString().trim() ?? "",
     minOrderQuantity: Number(row.minOrderQuantity || 1),
     stockQuantity: Number(row.stockQuantity || 0),
     stock: row.stock?.toString().trim() ?? "",
     shelfLifeDays: Number(row.shelfLifeDays || 0),
-    storageType: row.storageType?.toString().trim() ?? "ambient",
+    storageType: normalizeStorageTypeValue(row.storageType, "ambient"),
     status: row.status?.toString().trim() || "available",
     isActive:
       row.isActive === ""
@@ -472,7 +576,9 @@ export default function AddProductPage() {
         String(Math.max(1, Number(form.minOrderQuantity) || 1))
       );
       formData.append("shelfLifeDays", String(Number(form.shelfLifeDays) || 0));
-      formData.append("storageType", form.storageType);
+      if (form.storageType.trim()) {
+        formData.append("storageType", form.storageType.trim());
+      }
       formData.append("isFeatured", String(form.isFeatured));
       formData.append("isBestseller", String(form.isBestseller));
       formData.append(
@@ -518,8 +624,37 @@ export default function AddProductPage() {
 
   const downloadTemplate = () => {
     const worksheet = XLSX.utils.json_to_sheet(bulkTemplateRows);
+    const instructionsSheet = XLSX.utils.aoa_to_sheet([
+      ["Bulk Product Import Guide"],
+      [""],
+      ["How to use"],
+      ["1. Fill one row per product"],
+      ["2. Keep at least one valid variety per row"],
+      ["3. Upload CSV/XLS/XLSX and run Preview import"],
+      ["4. Fix failed rows before importing"],
+      [""],
+      ["Required columns"],
+      ["name", "brand", "sku", "category", "unit"],
+      ["minOrderQuantity", "stockQuantity", "status"],
+      ["Optional: packSizeLabel", "Optional: storageType"],
+      ["variety1_name", "variety1_originalPrice", "variety1_discountedPrice"],
+      [""],
+      ["Accepted stored units"],
+      [...unitOptions],
+      [""],
+      ["Accepted unit aliases"],
+      ...bulkUnitExamples.map((rule) => [rule]),
+      [""],
+      ["Important rules"],
+      ...bulkImportRules.map((rule) => [rule]),
+      [""],
+      ["Field reference"],
+      ["Column", "Required", "Rule", "Example"],
+      ...bulkImportFieldDocs,
+    ]);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+    XLSX.utils.book_append_sheet(workbook, instructionsSheet, "Instructions");
     XLSX.writeFile(workbook, "restaurant-supply-product-template.xlsx");
   };
 
@@ -956,7 +1091,7 @@ export default function AddProductPage() {
                   name="packSizeLabel"
                   value={form.packSizeLabel}
                   onChange={handleChange}
-                  placeholder="1 kg block / 24 x 200 ml"
+                  placeholder="Optional: 1 kg block / 24 x 200 ml"
                   className={`${inputClass} mt-1.5`}
                 />
               </div>
@@ -979,6 +1114,7 @@ export default function AddProductPage() {
                   onChange={handleChange}
                   className={`${inputClass} mt-1.5`}
                 >
+                  <option value="">Optional (defaults to Ambient)</option>
                   {storageOptions.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
@@ -1220,20 +1356,80 @@ export default function AddProductPage() {
           </label>
         </div>
 
-        <div className="mt-5 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
-          <div className="font-semibold">Required CSV columns</div>
-          <div className="mt-2 leading-6">
-            `name`, `brand`, `sku`, `category`, `unit`, `packSizeLabel`,
-            `minOrderQuantity`, `stockQuantity`, `storageType`, `status`, and at least one variety using
-            `variety1_name`, `variety1_originalPrice`, `variety1_discountedPrice`.
+        <div className="mt-5 space-y-4 rounded-2xl bg-amber-50 p-4 text-sm text-amber-900 ring-1 ring-amber-200">
+          <div>
+            <div className="font-semibold">Bulk import guide</div>
+            <p className="mt-2 leading-6">
+              Use the template for the fastest path. The downloaded workbook now includes an
+              `Instructions` sheet with the full import guide and field reference.
+            </p>
           </div>
-          <div className="mt-2 leading-6">
-            Supported optional columns include `description`, `upc`, `hsnCode`, `stock`,
-            `shelfLifeDays`, `isActive`, `isFeatured`, `isBestseller`, `ratingAverage`,
-            `ratingCount`, `seedRatingAverage`, `seedRatingCount`, `userRatingAverage`,
-            `userRatingCount`, `userRatingTotal`, `purchaseCount`, `displayOrder`, `badges`,
-            `primaryImage`, `images`, plus additional variety columns like `variety2_*` and
-            `variety3_*`. When images are omitted, products receive the default catalog image automatically.
+
+          <div>
+            <div className="font-semibold">Required columns</div>
+            <p className="mt-2 leading-6">
+              `name`, `brand`, `sku`, `category`, `unit`, `minOrderQuantity`,
+              `stockQuantity`, `status`, plus at least one variety using `variety1_name`,
+              `variety1_originalPrice`, and `variety1_discountedPrice`. Optional fields include
+              `packSizeLabel` and `storageType`.
+            </p>
+          </div>
+
+          <div>
+            <div className="font-semibold">Forgiving unit import</div>
+            <p className="mt-2 leading-6">
+              Common unit variants are normalized automatically before preview/import.
+            </p>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              {bulkUnitExamples.map((example) => (
+                <div key={example} className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-amber-200">
+                  {example}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold">Key rules</div>
+            <div className="mt-2 grid gap-2">
+              {bulkImportRules.map((rule) => (
+                <div key={rule} className="rounded-xl bg-white/70 px-3 py-2 ring-1 ring-amber-200">
+                  {rule}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold">Field reference</div>
+            <div className="mt-3 overflow-x-auto rounded-2xl bg-white/80 ring-1 ring-amber-200">
+              <table className="min-w-full divide-y divide-amber-200">
+                <thead className="bg-amber-100/80 text-left text-xs font-semibold uppercase tracking-wide text-amber-900">
+                  <tr>
+                    <th className="px-3 py-3">Column</th>
+                    <th className="px-3 py-3">Required</th>
+                    <th className="px-3 py-3">Rule</th>
+                    <th className="px-3 py-3">Example</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-amber-100 text-slate-700">
+                  {bulkImportFieldDocs.map(([column, required, rule, example]) => (
+                    <tr key={column}>
+                      <td className="px-3 py-3 font-mono text-xs text-slate-900">{column}</td>
+                      <td className="px-3 py-3">{required}</td>
+                      <td className="px-3 py-3">{rule}</td>
+                      <td className="px-3 py-3 font-mono text-xs">{example}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-3 leading-6">
+              Supported optional columns also include `description`, `upc`, `hsnCode`, `stock`,
+              `shelfLifeDays`, `isActive`, `isFeatured`, `isBestseller`, ratings fields,
+              `purchaseCount`, `displayOrder`, `badges`, `primaryImage`, `images`, and extra
+              variety groups like `variety2_*` and `variety3_*`.
+            </p>
           </div>
         </div>
       </section>
