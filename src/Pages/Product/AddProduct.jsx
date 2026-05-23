@@ -273,7 +273,9 @@ const extractBulkVarieties = (row) => {
       originalPrice: row[`variety${index}_originalPrice`],
       discountedPrice: row[`variety${index}_discountedPrice`],
       isAvailable:
-        row[`variety${index}_isAvailable`] === ""
+        row[`variety${index}_isAvailable`] === "" ||
+        row[`variety${index}_isAvailable`] === undefined ||
+        row[`variety${index}_isAvailable`] === null
           ? true
           : ["true", "1", "yes"].includes(
               String(row[`variety${index}_isAvailable`]).trim().toLowerCase()
