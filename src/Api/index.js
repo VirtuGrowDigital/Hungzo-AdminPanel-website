@@ -1,7 +1,7 @@
 import axios from "axios";
 
-const API_BASE = "https://api.hungzo.in";
-// const API_BASE = "http://10.94.85.219:4000";
+// const API_BASE = "https://api.hungzo.in";
+const API_BASE = "http://10.94.85.219:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
 
 
@@ -688,6 +688,24 @@ export async function bulkImportProducts(payload) {
       ok: false,
       message:
         error.response?.data?.message || "Failed to bulk import products",
+      data: error.response?.data,
+    };
+  }
+}
+
+export async function bulkUploadProductImages(formData) {
+  try {
+    const res = await API.post("/products/bulk-image-upload", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error.response?.data?.message || "Failed to bulk upload product images",
       data: error.response?.data,
     };
   }

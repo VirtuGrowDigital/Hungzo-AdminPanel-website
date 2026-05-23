@@ -14,6 +14,7 @@ import AddAdminPage from './Pages/Admin/AddAdminPage'
 import AdminListPage from './Pages/Admin/AdminListPage'
 import ProductsList from './Pages/Product/ProductsList'
 import AddProduct from './Pages/Product/AddProduct'
+import BulkProductImages from './Pages/Product/BulkProductImages'
 import CategoryManagement from './Pages/Product/CategoryManagement'
 import Banner from './Pages/Banner/Banner'
 import RestaurantsWallet from './Pages/Wallet/RestaurantsWallet'
@@ -77,6 +78,7 @@ export default function App() {
             <Route path='/product' element={<Navigate to="/product/inventory" replace />} />
             <Route path='/product/inventory' element={<ProtectedRoute><ProductsList /></ProtectedRoute>} />
             <Route path='/product/add' element={<ProtectedRoute><AddProduct /></ProtectedRoute>} />
+            <Route path='/product/bulk-images' element={<ProtectedRoute><BulkProductImages /></ProtectedRoute>} />
             <Route path='/product/categories' element={<ProtectedRoute><CategoryManagement /></ProtectedRoute>} />
             <Route path='/banner' element={<ProtectedRoute><Banner /></ProtectedRoute>} />
             <Route path='/warehouse' element={<ProtectedRoute><Warehouse /></ProtectedRoute>} />

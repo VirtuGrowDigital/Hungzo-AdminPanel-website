@@ -2031,11 +2031,11 @@ export default function ProductsList() {
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex items-center justify-between gap-2 p-2">
+                                    <div className="space-y-2 p-2">
                                       <button
                                         type="button"
                                         onClick={() => setPrimaryImage(image)}
-                                        className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
                                           editingProduct.primaryImage === image
                                             ? "bg-emerald-100 text-emerald-700"
                                             : "bg-slate-100 text-slate-600"
@@ -2045,29 +2045,32 @@ export default function ProductsList() {
                                           ? "Primary"
                                           : "Set primary"}
                                       </button>
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          disabled={index === 0}
-                                          onClick={() => moveExistingImage(index, -1)}
-                                          className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                          <ChevronUpIcon className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={index === editingProduct.images.length - 1}
-                                          onClick={() => moveExistingImage(index, 1)}
-                                          className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                          <ChevronDownIcon className="h-4 w-4" />
-                                        </button>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            disabled={index === 0}
+                                            onClick={() => moveExistingImage(index, -1)}
+                                            className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                          >
+                                            <ChevronUpIcon className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={index === editingProduct.images.length - 1}
+                                            onClick={() => moveExistingImage(index, 1)}
+                                            className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                          >
+                                            <ChevronDownIcon className="h-4 w-4" />
+                                          </button>
+                                        </div>
                                         <button
                                           type="button"
                                           onClick={() => removeExistingImage(image)}
-                                          className="rounded-lg bg-rose-50 p-1.5 text-rose-600"
+                                          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-600"
                                         >
                                           <TrashIcon className="h-4 w-4" />
+                                          Remove image
                                         </button>
                                       </div>
                                     </div>
@@ -2100,11 +2103,11 @@ export default function ProductsList() {
                                         </span>
                                       )}
                                     </div>
-                                    <div className="flex items-center justify-between gap-2 p-2">
+                                    <div className="space-y-2 p-2">
                                       <button
                                         type="button"
                                         onClick={() => setPrimaryImage(image.id)}
-                                        className={`rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
                                           editingProduct.primaryImage === image.id
                                             ? "bg-emerald-100 text-emerald-700"
                                             : "bg-slate-100 text-slate-600"
@@ -2114,29 +2117,32 @@ export default function ProductsList() {
                                           ? "Primary"
                                           : "Set primary"}
                                       </button>
-                                      <div className="flex items-center gap-1">
-                                        <button
-                                          type="button"
-                                          disabled={index === 0}
-                                          onClick={() => moveSelectedImage(index, -1)}
-                                          className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                          <ChevronUpIcon className="h-4 w-4" />
-                                        </button>
-                                        <button
-                                          type="button"
-                                          disabled={index === selectedImages.length - 1}
-                                          onClick={() => moveSelectedImage(index, 1)}
-                                          className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
-                                        >
-                                          <ChevronDownIcon className="h-4 w-4" />
-                                        </button>
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="flex items-center gap-1">
+                                          <button
+                                            type="button"
+                                            disabled={index === 0}
+                                            onClick={() => moveSelectedImage(index, -1)}
+                                            className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                          >
+                                            <ChevronUpIcon className="h-4 w-4" />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            disabled={index === selectedImages.length - 1}
+                                            onClick={() => moveSelectedImage(index, 1)}
+                                            className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
+                                          >
+                                            <ChevronDownIcon className="h-4 w-4" />
+                                          </button>
+                                        </div>
                                         <button
                                           type="button"
                                           onClick={() => removeSelectedImage(image.id)}
-                                          className="rounded-lg bg-rose-50 p-1.5 text-rose-600"
+                                          className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-600"
                                         >
                                           <TrashIcon className="h-4 w-4" />
+                                          Remove image
                                         </button>
                                       </div>
                                     </div>

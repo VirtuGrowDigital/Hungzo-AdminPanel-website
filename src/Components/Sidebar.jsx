@@ -26,6 +26,7 @@ const adminMenu = [
     children: [
       { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
       { to: "/product/add", label: "Add Products", icon: CubeIcon },
+      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
       { to: "/product/categories", label: "Category Management", icon: CubeIcon },
     ],
   },
@@ -65,6 +66,7 @@ const superAdminMenu = [
     children: [
       { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
       { to: "/product/add", label: "Add Products", icon: CubeIcon },
+      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
       { to: "/product/categories", label: "Category Management", icon: CubeIcon },
     ],
   },
