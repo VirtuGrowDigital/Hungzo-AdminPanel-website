@@ -20,7 +20,7 @@ const API = axios.create({
 
 export default API;
 
-// ================= create ADMINS ==================
+// ================= create ADMINS ================
 export async function createAdmin(formData) {
   try {
     const res = await API.post("/admin/create", formData);
