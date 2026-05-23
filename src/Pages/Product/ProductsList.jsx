@@ -67,13 +67,38 @@ const getProductsFromResponse = (payload) => {
 };
 const getProductFromResponse = (payload) =>
   payload?.product ?? payload?.data?.product ?? null;
+const extractImageUrl = (value) => {
+  if (!value) return "";
+
+  if (typeof value === "string") return value.trim();
+
+  if (Array.isArray(value)) {
+    return value.map(extractImageUrl).find(Boolean) ?? "";
+  }
+
+  if (typeof value === "object") {
+    return [
+      value.url,
+      value.location,
+      value.src,
+      value.href,
+      value.secure_url,
+      value.imageUrl,
+      value.image,
+      value.primaryImage,
+    ]
+      .map(extractImageUrl)
+      .find(Boolean) ?? "";
+  }
+
+  return "";
+};
 const getProductPrimaryImage = (product = {}) => {
-  const primaryImage =
-    typeof product.primaryImage === "string" ? product.primaryImage.trim() : "";
+  const primaryImage = extractImageUrl(product.primaryImage);
   if (primaryImage) return primaryImage;
 
   return toSafeArray(product.images)
-    .map((image) => image?.toString().trim())
+    .map(extractImageUrl)
     .find(Boolean) ?? "";
 };
 const getAvailableVarieties = (product = {}) =>
@@ -179,10 +204,9 @@ const createSelectedImageItem = (file) => ({
 
 const normalizeProductImages = (product = {}) => {
   const images = toSafeArray(product.images)
-    .map((image) => image?.toString().trim())
+    .map(extractImageUrl)
     .filter(Boolean);
-  const primaryImage =
-    typeof product.primaryImage === "string" ? product.primaryImage.trim() : "";
+  const primaryImage = extractImageUrl(product.primaryImage);
 
   if (primaryImage && images.includes(primaryImage)) {
     return [primaryImage, ...images.filter((image) => image !== primaryImage)];
