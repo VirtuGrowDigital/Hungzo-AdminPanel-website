@@ -104,8 +104,8 @@ export default function BulkProductImages() {
 
   const rows = preview?.rows ?? [];
   const archiveErrors = preview?.archiveErrors ?? [];
-  const hasBlockingErrors =
-    archiveErrors.length > 0 || rows.some((row) => (row.errors?.length ?? 0) > 0);
+  const readyRows = rows.filter((row) => (row.errors?.length ?? 0) === 0);
+  const hasBlockingErrors = archiveErrors.length > 0 || readyRows.length === 0;
 
   return (
     <div className="min-h-full bg-slate-50 px-4 py-6 md:px-6 lg:px-8">
@@ -225,7 +225,7 @@ export default function BulkProductImages() {
                   className={`${buttonClass} bg-emerald-600 text-white hover:bg-emerald-500`}
                 >
                   {applying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Apply images
+                  Apply valid images
                 </button>
               </div>
             </div>
@@ -282,6 +282,19 @@ export default function BulkProductImages() {
                     <p key={error}>{error}</p>
                   ))}
                 </div>
+              </div>
+            ) : null}
+
+            {archiveErrors.length === 0 && rows.some((row) => (row.errors?.length ?? 0) > 0) ? (
+              <div className="mt-6 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-amber-800">
+                  <AlertTriangle className="h-4 w-4" />
+                  Some SKUs will be skipped
+                </div>
+                <p className="mt-2 text-sm text-amber-800">
+                  {readyRows.length} valid SKU image sets can be uploaded now.{" "}
+                  {rows.length - readyRows.length} SKU rows have errors and will be skipped automatically.
+                </p>
               </div>
             ) : null}
 
