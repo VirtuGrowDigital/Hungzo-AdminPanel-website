@@ -67,6 +67,8 @@ const getProductsFromResponse = (payload) => {
 };
 const getProductFromResponse = (payload) =>
   payload?.product ?? payload?.data?.product ?? null;
+const LEGACY_PRODUCT_IMAGE_URL =
+  "https://via.placeholder.com/600x600?text=Hungzo+Product";
 const extractImageUrl = (value) => {
   if (!value) return "";
 
@@ -95,10 +97,11 @@ const extractImageUrl = (value) => {
 };
 const getProductPrimaryImage = (product = {}) => {
   const primaryImage = extractImageUrl(product.primaryImage);
-  if (primaryImage) return primaryImage;
+  if (primaryImage && primaryImage !== LEGACY_PRODUCT_IMAGE_URL) return primaryImage;
 
   return toSafeArray(product.images)
     .map(extractImageUrl)
+    .filter((image) => image !== LEGACY_PRODUCT_IMAGE_URL)
     .find(Boolean) ?? "";
 };
 const getAvailableVarieties = (product = {}) =>
@@ -205,10 +208,15 @@ const createSelectedImageItem = (file) => ({
 const normalizeProductImages = (product = {}) => {
   const images = toSafeArray(product.images)
     .map(extractImageUrl)
+    .filter((image) => image !== LEGACY_PRODUCT_IMAGE_URL)
     .filter(Boolean);
   const primaryImage = extractImageUrl(product.primaryImage);
 
-  if (primaryImage && images.includes(primaryImage)) {
+  if (
+    primaryImage &&
+    primaryImage !== LEGACY_PRODUCT_IMAGE_URL &&
+    images.includes(primaryImage)
+  ) {
     return [primaryImage, ...images.filter((image) => image !== primaryImage)];
   }
 
@@ -250,7 +258,7 @@ const normalizeProductForEdit = (product) => ({
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
 const DEFAULT_PRODUCT_IMAGE_URL =
-  "https://via.placeholder.com/600x600?text=Hungzo+Product";
+  "https://hungzo-product-images.s3.ap-south-1.amazonaws.com/defaults/hungzo-product-default.png";
 const unitOptions = ["kg", "g", "l", "ml", "pcs", "packs", "boxes", "jars", "bottles", "cans"];
 const storageOptions = [
   { value: "ambient", label: "Ambient" },
