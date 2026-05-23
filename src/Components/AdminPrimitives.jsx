@@ -30,7 +30,7 @@ export function AdminHero({
   const eyebrowClass = gradient.split(" ").slice(-1)[0];
 
   return (
-    <section className={cn("rounded-[1.75rem] bg-gradient-to-r p-6 text-white shadow-xl", gradient)}>
+    <section className={cn("rounded-[1.75rem] bg-linear-to-r p-6 text-white shadow-xl", gradient)}>
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="flex items-start gap-3">
           {Icon ? (
@@ -68,7 +68,7 @@ export function AdminHero({
 
 export function AdminPanel({ children, className = "" }) {
   return (
-    <section className={cn("overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white shadow-sm", className)}>
+    <section className={cn("overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm", className)}>
       {children}
     </section>
   );
