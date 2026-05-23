@@ -102,7 +102,7 @@ const getProductPrimaryImage = (product = {}) => {
   return toSafeArray(product.images)
     .map(extractImageUrl)
     .filter((image) => image !== LEGACY_PRODUCT_IMAGE_URL)
-    .find(Boolean) ?? "";
+    .find(Boolean) ?? DEFAULT_PRODUCT_IMAGE_URL;
 };
 const getAvailableVarieties = (product = {}) =>
   toSafeArray(product.varieties).filter((variety) => variety?.isAvailable !== false);
