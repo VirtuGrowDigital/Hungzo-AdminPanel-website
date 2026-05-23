@@ -34,7 +34,7 @@ export async function createAdmin(formData) {
   }
 }
 
-// ================= WAREHOUSE ==================
+// ================= WAREHOUSE =================
 export async function getWarehouses() {
   try {
     const res = await API.get("/warehouses");
