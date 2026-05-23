@@ -188,6 +188,9 @@ const normalizeVarietyForForm = (variety = {}) => {
 
 const MAX_PRODUCT_IMAGES = 5;
 const UPLOAD_REFERENCE_PREFIX = "__UPLOAD_";
+const ALLOWED_PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_PRODUCT_UPLOAD_TOTAL_BYTES = 8 * 1024 * 1024;
 
 const getUploadReference = (index) => `${UPLOAD_REFERENCE_PREFIX}${index}__`;
 
@@ -301,6 +304,7 @@ export default function ProductsList() {
   });
   const [editingProduct, setEditingProduct] = useState(null);
   const [selectedImages, setSelectedImages] = useState([]);
+  const [imageSelectionError, setImageSelectionError] = useState("");
   const [statusLoading, setStatusLoading] = useState(null);
   const [updateLoading, setUpdateLoading] = useState(false);
   const [productsLoading, setProductsLoading] = useState(true);
@@ -472,6 +476,7 @@ export default function ProductsList() {
 
   const handleEdit = (product) => {
     setEditingProduct(normalizeProductForEdit(product));
+    setImageSelectionError("");
     setSelectedImages((prev) => {
       prev.forEach((image) => {
         if (image.previewUrl) {
@@ -493,6 +498,7 @@ export default function ProductsList() {
       });
       return [];
     });
+    setImageSelectionError("");
     setEditingProduct(null);
     setProductReviews([]);
   };
@@ -561,12 +567,18 @@ export default function ProductsList() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
+    const nextErrors = [];
     const validFiles = files.filter(
-      (file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
+      (file) => {
+        const validType = ALLOWED_PRODUCT_IMAGE_TYPES.includes(file.type);
+        const validSize = file.size <= MAX_PRODUCT_IMAGE_SIZE_BYTES;
+        return validType && validSize;
+      }
     );
 
     if (validFiles.length !== files.length) {
-      toast.error("Only image files up to 5MB are allowed");
+      nextErrors.push("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+      toast.error("Only JPG, PNG, or WEBP images up to 5MB are allowed");
     }
 
     const currentImageCount =
@@ -575,10 +587,30 @@ export default function ProductsList() {
     const acceptedFiles = validFiles.slice(0, remainingSlots);
 
     if (validFiles.length > remainingSlots) {
+      nextErrors.push(`You can upload up to ${MAX_PRODUCT_IMAGES} product images.`);
       toast.error(`You can upload up to ${MAX_PRODUCT_IMAGES} product images`);
     }
 
-    const nextFiles = acceptedFiles.map(createSelectedImageItem);
+    const currentSelectedBytes = selectedImages.reduce(
+      (total, image) => total + (image.file?.size || 0),
+      0
+    );
+    let runningTotalBytes = currentSelectedBytes;
+    const uploadableFiles = [];
+
+    acceptedFiles.forEach((file) => {
+      if (runningTotalBytes + file.size <= MAX_PRODUCT_UPLOAD_TOTAL_BYTES) {
+        uploadableFiles.push(file);
+        runningTotalBytes += file.size;
+      }
+    });
+
+    if (uploadableFiles.length !== acceptedFiles.length) {
+      nextErrors.push("Total new upload size cannot exceed 8MB per update.");
+      toast.error("Total new upload size cannot exceed 8MB per update");
+    }
+
+    const nextFiles = uploadableFiles.map(createSelectedImageItem);
 
     setSelectedImages((prev) => {
       const combinedImages = [...prev, ...nextFiles];
@@ -591,6 +623,7 @@ export default function ProductsList() {
       }
       return combinedImages;
     });
+    setImageSelectionError(nextErrors[0] || "");
     e.target.value = "";
   };
 
@@ -607,6 +640,7 @@ export default function ProductsList() {
             : prev.primaryImage,
       };
     });
+    setImageSelectionError("");
   };
 
   const removeSelectedImage = (imageId) => {
@@ -629,6 +663,7 @@ export default function ProductsList() {
       );
       return nextImages;
     });
+    setImageSelectionError("");
   };
 
   const moveExistingImage = (index, direction) => {
@@ -829,6 +864,7 @@ export default function ProductsList() {
         await loadProducts();
       }
       setEditingProduct(null);
+      setImageSelectionError("");
       setSelectedImages((prev) => {
         prev.forEach((image) => {
           if (image.previewUrl) {
@@ -1951,10 +1987,15 @@ export default function ProductsList() {
                         <input
                           type="file"
                           multiple
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           onChange={handleImageSelect}
                           className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-emerald-700`}
                         />
+                        {imageSelectionError && (
+                          <p className="mt-2 text-xs font-medium text-rose-600">
+                            {imageSelectionError}
+                          </p>
+                        )}
                         <p className="mt-2 text-xs text-slate-400">
                           Keep, remove, reorder, and add images in one flow. The selected primary image
                           becomes the storefront cover.

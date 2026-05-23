@@ -163,6 +163,9 @@ const storageOptions = [
 ];
 const MAX_PRODUCT_IMAGES = 5;
 const UPLOAD_REFERENCE_PREFIX = "__UPLOAD_";
+const ALLOWED_PRODUCT_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_PRODUCT_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_PRODUCT_UPLOAD_TOTAL_BYTES = 8 * 1024 * 1024;
 
 const bulkTemplateRows = [
   {
@@ -346,6 +349,7 @@ export default function AddProductPage() {
   const [varieties, setVarieties] = useState([createEmptyVariety()]);
   const [images, setImages] = useState([]);
   const [primaryImageRef, setPrimaryImageRef] = useState("");
+  const [imageSelectionError, setImageSelectionError] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState(null);
   const [bulkRows, setBulkRows] = useState([]);
@@ -418,12 +422,18 @@ export default function AddProductPage() {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
+    const nextErrors = [];
     const validFiles = files.filter(
-      (file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
+      (file) => {
+        const validType = ALLOWED_PRODUCT_IMAGE_TYPES.includes(file.type);
+        const validSize = file.size <= MAX_PRODUCT_IMAGE_SIZE_BYTES;
+        return validType && validSize;
+      }
     );
 
     if (validFiles.length !== files.length) {
-      toast.error("Only image files up to 5MB are allowed");
+      nextErrors.push("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
+      toast.error("Only JPG, PNG, or WEBP images up to 5MB are allowed");
     }
 
     setImages((prev) => {
@@ -431,10 +441,30 @@ export default function AddProductPage() {
       const acceptedFiles = validFiles.slice(0, remainingSlots);
 
       if (validFiles.length > remainingSlots) {
+        nextErrors.push(`You can upload up to ${MAX_PRODUCT_IMAGES} product images.`);
         toast.error(`You can upload up to ${MAX_PRODUCT_IMAGES} product images`);
       }
 
-      const mapped = acceptedFiles.map(buildImageItem);
+      const currentSelectedBytes = prev.reduce(
+        (total, image) => total + (image.file?.size || 0),
+        0
+      );
+      let runningTotalBytes = currentSelectedBytes;
+      const uploadableFiles = [];
+
+      acceptedFiles.forEach((file) => {
+        if (runningTotalBytes + file.size <= MAX_PRODUCT_UPLOAD_TOTAL_BYTES) {
+          uploadableFiles.push(file);
+          runningTotalBytes += file.size;
+        }
+      });
+
+      if (uploadableFiles.length !== acceptedFiles.length) {
+        nextErrors.push("Total new upload size cannot exceed 8MB per product.");
+        toast.error("Total new upload size cannot exceed 8MB per product");
+      }
+
+      const mapped = uploadableFiles.map(buildImageItem);
       const nextImages = [...prev, ...mapped];
 
       setPrimaryImageRef((currentPrimaryImageRef) =>
@@ -444,6 +474,7 @@ export default function AddProductPage() {
       return nextImages;
     });
 
+    setImageSelectionError(nextErrors[0] || "");
     e.target.value = "";
   };
 
@@ -460,6 +491,7 @@ export default function AddProductPage() {
       );
       return next;
     });
+    setImageSelectionError("");
   };
 
   const moveImage = (index, direction) => {
@@ -540,6 +572,7 @@ export default function AddProductPage() {
     setVarieties([createEmptyVariety()]);
     setImages([]);
     setPrimaryImageRef("");
+    setImageSelectionError("");
   };
 
   const resetBulkState = () => {
@@ -1166,10 +1199,15 @@ export default function AddProductPage() {
               <input
                 type="file"
                 multiple
-                accept="image/*"
+                accept="image/jpeg,image/png,image/webp"
                 onChange={handleFiles}
                 className={`${inputClass} mt-1.5 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-emerald-700`}
               />
+              {imageSelectionError && (
+                <p className="mt-2 text-xs font-medium text-rose-600">
+                  {imageSelectionError}
+                </p>
+              )}
               <p className="mt-2 text-xs text-slate-400">
                 Upload up to 5 images. Set any image as primary and reorder the gallery before publishing.
                 If you skip images, the system applies the default catalog image automatically.
