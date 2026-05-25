@@ -246,7 +246,7 @@ export default function Sidebar() {
   return (
     <aside className="sticky top-0 h-screen w-64 shrink-0 overflow-hidden border-r border-slate-800/80 bg-[linear-gradient(180deg,#0b1220_0%,#0f172a_52%,#111827_100%)] px-4 py-4 text-white">
       <div className="flex h-full flex-col">
-        <Link to="/" className="rounded-2xl px-2 py-2 transition hover:bg-white/[0.04]">
+        <Link to="/" className="rounded-2xl px-2 py-2 transition hover:bg-white/4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white">
               <img src={logo} alt="logo" className="h-7 w-7" />
