@@ -907,9 +907,14 @@ export async function assignWarehouseToOrder(orderId, warehouseId) {
   }
 }
 
-export async function verifyPickupOtp(orderId, otp) {
+export async function verifyPickupOtp(orderId, otp, paymentMode) {
   try {
-    const res = await API.post(`/orders/pickup-verify/${orderId}`, { otp });
+    const payload = { otp };
+    if (paymentMode) {
+      payload.paymentMode = paymentMode;
+    }
+
+    const res = await API.post(`/orders/pickup-verify/${orderId}`, payload);
     return { ok: true, data: res.data };
   } catch (error) {
     return {

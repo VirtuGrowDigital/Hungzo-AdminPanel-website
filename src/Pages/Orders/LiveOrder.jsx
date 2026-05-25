@@ -106,6 +106,7 @@ const LiveOrderTable = () => {
   const [warehouseDrafts, setWarehouseDrafts] = useState({});
   const [assigningWarehouseId, setAssigningWarehouseId] = useState(null);
   const [pickupOtpDrafts, setPickupOtpDrafts] = useState({});
+  const [pickupPaymentModeDrafts, setPickupPaymentModeDrafts] = useState({});
   const [verifyingPickupOrderId, setVerifyingPickupOrderId] = useState(null);
   // console.log(orders);
 
@@ -296,16 +297,23 @@ const LiveOrderTable = () => {
     }
   };
 
-  const verifyPickupOtp = async (orderId) => {
+  const verifyPickupOtp = async (order) => {
+    const orderId = order._id;
     const otp = (pickupOtpDrafts[orderId] || "").trim();
     if (!otp) {
       toast.error("Enter the pickup OTP first");
       return;
     }
 
+    const requiresPaymentCollection =
+      order.paymentStatus !== "paid" && order.paymentMethod === "COD";
+    const paymentMode = requiresPaymentCollection
+      ? pickupPaymentModeDrafts[orderId] || "CASH"
+      : undefined;
+
     try {
       setVerifyingPickupOrderId(orderId);
-      const res = await verifyPickupOtpAPI(orderId, otp);
+      const res = await verifyPickupOtpAPI(orderId, otp, paymentMode);
 
       if (!res.ok) {
         toast.error(res.message || "Failed to verify pickup OTP");
@@ -322,6 +330,10 @@ const LiveOrderTable = () => {
       setPickupOtpDrafts((prev) => ({
         ...prev,
         [orderId]: "",
+      }));
+      setPickupPaymentModeDrafts((prev) => ({
+        ...prev,
+        [orderId]: "CASH",
       }));
       setStatusDrafts((prev) => ({
         ...prev,
@@ -417,6 +429,10 @@ const LiveOrderTable = () => {
                   order.pickupOtpGeneratedAt &&
                   !order.pickupOtpVerifiedAt &&
                   order.orderStatus !== "Cancelled";
+                const requiresPickupPaymentCollection =
+                  showPickupVerification &&
+                  order.paymentStatus !== "paid" &&
+                  order.paymentMethod === "COD";
 
                 return (
                   <tr
@@ -480,6 +496,31 @@ const LiveOrderTable = () => {
                           </div>
                           {showPickupVerification ? (
                             <div className="space-y-1 pt-1">
+                              {requiresPickupPaymentCollection ? (
+                                <>
+                                  <select
+                                    value={
+                                      pickupPaymentModeDrafts[order._id] ??
+                                      "CASH"
+                                    }
+                                    onChange={(e) =>
+                                      setPickupPaymentModeDrafts((prev) => ({
+                                        ...prev,
+                                        [order._id]: e.target.value,
+                                      }))
+                                    }
+                                    className="block w-full rounded border border-gray-300 px-2 py-1 text-xs"
+                                  >
+                                    <option value="CASH">
+                                      Mark cash as collected
+                                    </option>
+                                  </select>
+                                  <div className="text-[11px] text-amber-600">
+                                    Verifying this OTP will also capture the
+                                    remaining COD amount at pickup.
+                                  </div>
+                                </>
+                              ) : null}
                               <input
                                 type="text"
                                 value={pickupOtpDrafts[order._id] ?? ""}
@@ -495,7 +536,7 @@ const LiveOrderTable = () => {
                                 className="block w-full rounded border border-gray-300 px-2 py-1 text-xs"
                               />
                               <button
-                                onClick={() => verifyPickupOtp(order._id)}
+                                onClick={() => verifyPickupOtp(order)}
                                 disabled={verifyingPickupOrderId === order._id}
                                 className={`block w-full rounded py-1 text-xs text-white ${
                                   verifyingPickupOrderId === order._id
@@ -631,6 +672,14 @@ const OrderDetailsModal = ({
             <strong>Payment:</strong> {order.paymentMethod} (
             {order.paymentStatus})
             </p>
+            {order.fulfillmentType === "SELF_PICKUP" &&
+            order.pickupPaymentMethod &&
+            order.pickupPaymentMethod !== "NONE" ? (
+              <p className="break-words">
+                <strong>Pickup Payment:</strong> {order.pickupPaymentMethod} (
+                {order.paymentModeAtPickup || "PAID"})
+              </p>
+            ) : null}
             <p className="break-words">
               <strong>Razorpay ID:</strong> {order.razorpayOrderId || "N/A"}
             </p>

@@ -30,6 +30,10 @@ const initialFormState = {
   name: "",
   fullAddress: "",
   status: "open",
+  serviceArea: {
+    deliveryRadiusKm: "0",
+    selfPickupRadiusKm: "0",
+  },
   location: emptyLocation(),
 };
 
@@ -60,6 +64,10 @@ const toPayload = (form) => ({
   name: form.name.trim(),
   fullAddress: form.fullAddress.trim(),
   status: form.status,
+  serviceArea: {
+    deliveryRadiusKm: Number(form.serviceArea.deliveryRadiusKm || 0),
+    selfPickupRadiusKm: Number(form.serviceArea.selfPickupRadiusKm || 0),
+  },
   location: {
     optionType: form.location.optionType,
     mapLink: form.location.mapLink.trim(),
@@ -72,6 +80,10 @@ const normalizeWarehouseForEdit = (warehouse) => ({
   name: warehouse?.name || "",
   fullAddress: warehouse?.fullAddress || "",
   status: warehouse?.status || "open",
+  serviceArea: {
+    deliveryRadiusKm: String(warehouse?.serviceArea?.deliveryRadiusKm ?? 0),
+    selfPickupRadiusKm: String(warehouse?.serviceArea?.selfPickupRadiusKm ?? 0),
+  },
   location: warehouse?.location
     ? {
         optionType: warehouse.location.optionType || "current_location",
@@ -107,6 +119,16 @@ const validateForm = (form) => {
 
   if (!hasCoordinates && !form.location.mapLink.trim()) {
     return "Location needs coordinates or a Google Map link";
+  }
+
+  const deliveryRadiusKm = Number(form.serviceArea.deliveryRadiusKm);
+  const selfPickupRadiusKm = Number(form.serviceArea.selfPickupRadiusKm);
+  if (!Number.isFinite(deliveryRadiusKm) || deliveryRadiusKm < 0) {
+    return "Delivery radius must be zero or greater";
+  }
+
+  if (!Number.isFinite(selfPickupRadiusKm) || selfPickupRadiusKm < 0) {
+    return "Self pickup radius must be zero or greater";
   }
 
   return null;
@@ -267,6 +289,12 @@ export default function Warehouse() {
         name: warehouse.name,
         fullAddress: warehouse.fullAddress || "",
         status: nextStatus,
+        serviceArea: {
+          deliveryRadiusKm: Number(warehouse?.serviceArea?.deliveryRadiusKm || 0),
+          selfPickupRadiusKm: Number(
+            warehouse?.serviceArea?.selfPickupRadiusKm || 0
+          ),
+        },
         location: {
           optionType: warehouse.location?.optionType,
           mapLink: warehouse.location?.mapLink || "",
@@ -408,6 +436,52 @@ export default function Warehouse() {
                   <option value="open">Open</option>
                   <option value="close">Close</option>
                 </select>
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">
+                  Delivery Radius (km)
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={form.serviceArea.deliveryRadiusKm}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      serviceArea: {
+                        ...current.serviceArea,
+                        deliveryRadiusKm: event.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">
+                  Self Pickup Radius (km)
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.1"
+                  value={form.serviceArea.selfPickupRadiusKm}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      serviceArea: {
+                        ...current.serviceArea,
+                        selfPickupRadiusKm: event.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="0"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
+                />
               </label>
             </div>
 
@@ -633,6 +707,12 @@ export default function Warehouse() {
                     </div>
 
                     <div className="mt-2 flex flex-col gap-1">
+                      <span>
+                        Delivery radius: {Number(warehouse?.serviceArea?.deliveryRadiusKm || 0)} km
+                      </span>
+                      <span>
+                        Self pickup radius: {Number(warehouse?.serviceArea?.selfPickupRadiusKm || 0)} km
+                      </span>
                       {coordinates.length === 2 ? (
                         <span>
                           Coordinates: {coordinates[1]}, {coordinates[0]}
