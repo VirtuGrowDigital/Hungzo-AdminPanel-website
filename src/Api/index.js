@@ -9,6 +9,50 @@ const API = axios.create({
   baseURL: API_BASE,
 });
 
+const sharedGetState = new Map();
+
+function getSharedGetRequest(key, requestFactory, cacheMs = 1000) {
+  const now = Date.now();
+  const existing = sharedGetState.get(key);
+
+  if (existing?.promise) {
+    return existing.promise;
+  }
+
+  if (existing?.data && now - existing.timestamp < cacheMs) {
+    return Promise.resolve(existing.data);
+  }
+
+  const promise = requestFactory()
+    .then((data) => {
+      sharedGetState.set(key, {
+        data,
+        timestamp: Date.now(),
+      });
+      return data;
+    })
+    .catch((error) => {
+      sharedGetState.delete(key);
+      throw error;
+    })
+    .finally(() => {
+      const current = sharedGetState.get(key);
+      if (current?.promise === promise) {
+        sharedGetState.set(key, {
+          data: current.data,
+          timestamp: current.timestamp,
+        });
+      }
+    });
+
+  sharedGetState.set(key, {
+    ...existing,
+    promise,
+  });
+
+  return promise;
+}
+
   // Attach token automatically
   API.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
@@ -37,7 +81,11 @@ export async function createAdmin(formData) {
 // ================= WAREHOUSE =================
 export async function getWarehouses() {
   try {
-    const res = await API.get("/warehouses");
+    const res = await getSharedGetRequest(
+      "GET:/warehouses",
+      () => API.get("/warehouses"),
+      5000
+    );
     return res.data;
   } catch (error) {
     return {
@@ -830,7 +878,10 @@ export async function fetchDriverReviewsAdmin(driverId) {
 /* ================= GET ADMIN ORDERS ================= */
 export async function getAdminOrders() {
   try {
-    const res = await API.get("/orders/admin");
+    const res = await getSharedGetRequest(
+      "GET:/orders/admin",
+      () => API.get("/orders/admin")
+    );
     return { ok: true, data: res.data };
   } catch (error) {
     return {
@@ -844,7 +895,10 @@ export async function getAdminOrders() {
 /* ================= GET ALL ORDERS (SUPERADMIN) ================= */
 export async function getAllOrders() {
   try {
-    const res = await API.get("/orders/all");
+    const res = await getSharedGetRequest(
+      "GET:/orders/all",
+      () => API.get("/orders/all")
+    );
     return { ok: true, data: res.data };
   } catch (error) {
     return {

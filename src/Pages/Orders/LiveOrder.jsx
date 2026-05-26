@@ -105,6 +105,7 @@ const NewOrderPopup = ({ order, onClose }) => {
 /* ================= MAIN COMPONENT ================= */
 const LiveOrderTable = () => {
   const { user } = useAuth();
+  const userRole = user?.role;
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -127,11 +128,10 @@ const LiveOrderTable = () => {
     try {
       let res;
 
-      if (user?.role === "SUPERADMIN") {
+      if (userRole === "SUPERADMIN") {
         res = await getAllOrders();
-      } else if (user?.role === "ADMIN") {
+      } else if (userRole === "ADMIN") {
         res = await getAdminOrders();
-         console.log(res);
       } else {
         return;
       }
@@ -186,13 +186,13 @@ const LiveOrderTable = () => {
 
   /* ================= POLLING ================= */
   useEffect(() => {
-    if (!user?.role) return;
+    if (!userRole) return;
 
     loadOrders();
     const timer = setInterval(loadOrders, POLL_INTERVAL);
 
     return () => clearInterval(timer);
-  }, [user]);
+  }, [userRole]);
 
   useEffect(() => {
     const loadWarehouseOptions = async () => {

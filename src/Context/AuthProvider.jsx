@@ -12,6 +12,7 @@ const EXPIRY_TIME = 42 * 60 * 60 * 1000;
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [isHydrated, setIsHydrated] = useState(false);
   const navigate = useNavigate();
 
   /* ----------------------------------------
@@ -19,7 +20,10 @@ export function AuthProvider({ children }) {
   ---------------------------------------- */
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (!stored) return;
+    if (!stored) {
+      setIsHydrated(true);
+      return;
+    }
 
     try {
       const data = JSON.parse(stored);
@@ -27,12 +31,15 @@ export function AuthProvider({ children }) {
       // ❌ expired on refresh
       if (Date.now() > data.expiresAt) {
         clearAuth();
+        setIsHydrated(true);
         return;
       }
 
       setUser(data);
     } catch {
       clearAuth();
+    } finally {
+      setIsHydrated(true);
     }
   }, []);
 
@@ -108,6 +115,7 @@ export function AuthProvider({ children }) {
         login,
         logout,
         isAuthenticated: !!user,
+        isHydrated,
       }}
     >
       {children}

@@ -259,6 +259,7 @@ const PAYMENT_OPTIONS = [
 /* ================= MAIN ================= */
 const OrderHistory = ({ mode = "all" }) => {
   const { user } = useAuth();
+  const userRole = user?.role;
 
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -323,15 +324,15 @@ const OrderHistory = ({ mode = "all" }) => {
   };
 
   const loadData = useCallback(async () => {
-    if (!user?.role) return;
+    if (!userRole) return;
 
     try {
       setLoading(true);
 
       let res;
-      if (user.role === "SUPERADMIN") {
+      if (userRole === "SUPERADMIN") {
         res = await getAllOrders();
-      } else if (user.role === "ADMIN") {
+      } else if (userRole === "ADMIN") {
         res = await getAdminOrders();
       } else {
         return;
@@ -355,7 +356,7 @@ const OrderHistory = ({ mode = "all" }) => {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [userRole]);
 
   /* ================= LOAD ORDERS ================= */
   useEffect(() => {
