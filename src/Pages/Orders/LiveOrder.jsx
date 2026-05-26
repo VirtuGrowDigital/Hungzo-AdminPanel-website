@@ -26,6 +26,14 @@ const formatFulfillmentType = (type) => {
     .join(" ");
 };
 
+const asAmount = (value) => {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const getAdminOrderTotal = (order) =>
+  Math.max(asAmount(order?.totalAmount) - asAmount(order?.gstAmount), 0);
+
 const POLL_INTERVAL = 60000;
 
 const DELIVERY_ORDER_STATUS_OPTIONS = [
@@ -72,7 +80,7 @@ const NewOrderPopup = ({ order, onClose }) => {
             <b>Order:</b> {order._id.substring(0, 8)}
           </p>
           <p>
-            <b>Total:</b> ₹{order.totalAmount}
+            <b>Total:</b> ₹{getAdminOrderTotal(order)}
           </p>
           <p>
             <b>Customer:</b>{" "}
@@ -448,7 +456,7 @@ const LiveOrderTable = () => {
                         order.userDetails?.email}
                     </td>
                     <td className="p-3 font-semibold text-center">
-                      ₹{order.totalAmount}
+                      ₹{getAdminOrderTotal(order)}
                     </td>
                     <td className="p-3 text-sm text-center">
                       {formatFulfillmentType(order.fulfillmentType)}
@@ -797,17 +805,13 @@ const OrderDetailsModal = ({
               <span>₹{order.platformFee}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span>GST</span>
-              <span>₹{order.gstAmount}</span>
-            </div>
-            <div className="flex justify-between gap-4">
               <span>Delivery</span>
               <span>₹{order.deliveryCharge}</span>
             </div>
 
             <div className="mt-2 flex justify-between gap-4 border-t pt-3 text-base font-bold">
               <span>Total</span>
-              <span>₹{order.totalAmount}</span>
+              <span>₹{getAdminOrderTotal(order)}</span>
             </div>
           </div>
         </div>

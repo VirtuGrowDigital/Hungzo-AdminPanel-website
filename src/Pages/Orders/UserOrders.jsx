@@ -15,6 +15,14 @@ const getStatusColor = (status) => {
     }
 };
 
+const asAmount = (value) => {
+    const numeric = Number(value || 0);
+    return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const getAdminOrderTotal = (order) =>
+    Math.max(asAmount(order?.totalAmount) - asAmount(order?.gstAmount), 0);
+
 const UserOrders = () => {
     const { userId } = useParams();
     const [orders, setOrders] = useState([]);
@@ -98,7 +106,7 @@ const UserOrders = () => {
 
                             {/* PAYMENT + AMOUNT */}
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm mb-3">
-                                <p><b>Total:</b> ₹{order.totalAmount}</p>
+                                <p><b>Total:</b> ₹{getAdminOrderTotal(order)}</p>
                                 <p><b>Payment:</b> {order.paymentMethod}</p>
                                 <p><b>Status:</b> {order.paymentStatus}</p>
                                 <p><b>Type:</b> {order.fulfillmentType}</p>

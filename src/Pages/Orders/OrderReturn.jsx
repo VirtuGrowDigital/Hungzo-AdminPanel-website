@@ -37,6 +37,14 @@ const formatFulfillmentType = (type) => {
     .join(" ");
 };
 
+const asAmount = (value) => {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const getAdminOrderTotal = (order) =>
+  Math.max(asAmount(order?.totalAmount) - asAmount(order?.gstAmount), 0);
+
 const OrderReturn = () => {
   const [returns, setReturns] = useState([]);
   const [filteredReturns, setFilteredReturns] = useState([]);
@@ -533,7 +541,7 @@ const OrderReturn = () => {
                         {selectedReturn.order?.totalAmount && (
                           <div className="col-span-2 space-y-1">
                             <span className="text-xs text-gray-600">Original Order Amount</span>
-                            <p className="text-lg font-semibold text-gray-900">₹{selectedReturn.order.totalAmount}</p>
+                            <p className="text-lg font-semibold text-gray-900">₹{getAdminOrderTotal(selectedReturn.order)}</p>
                           </div>
                         )}
                       </div>

@@ -55,6 +55,16 @@ const formatFulfillmentType = (type) => {
     .join(" ");
 };
 
+const asAmount = (value) => {
+  const numeric = Number(value || 0);
+  return Number.isFinite(numeric) ? numeric : 0;
+};
+
+const getAdminOrderTotal = (order) => asAmount(order?.totalAmount);
+
+const getAdminPayableAmount = (order) =>
+  Math.max(getAdminOrderTotal(order) - asAmount(order?.walletUsed), 0);
+
 const deriveRefundMeta = (order) => {
   if (!order) {
     return {
@@ -89,9 +99,9 @@ const deriveRefundMeta = (order) => {
   }
 
   const paidAmount =
-    order.paymentStatus === "paid" ? Number(order.totalAmount || 0) : 0;
+    order.paymentStatus === "paid" ? getAdminOrderTotal(order) : 0;
   const walletAmount =
-    order.paymentStatus !== "paid" ? Number(order.walletUsed || 0) : 0;
+    order.paymentStatus !== "paid" ? asAmount(order.walletUsed) : 0;
   const refundAmount = paidAmount > 0 ? paidAmount : walletAmount;
 
   return {
@@ -101,6 +111,20 @@ const deriveRefundMeta = (order) => {
     refundDeductionAmount: 0,
     refundDeductionReason: "",
   };
+};
+
+const hasRefundablePrepaidAmount = (order) => {
+  if (!order || order.orderStatus !== "Cancelled") {
+    return false;
+  }
+
+  const usedWalletAmount = asAmount(
+    order.walletUsed ?? order.walletChargedAmount
+  );
+  const paidOnline =
+    order.paymentMethod === "ONLINE" && order.paymentStatus === "paid";
+
+  return usedWalletAmount > 0 || paidOnline;
 };
 
 /* ================= CSV EXPORT HELPERS ================= */
@@ -286,8 +310,8 @@ const OrderHistory = ({ mode = "all" }) => {
           : o.orderStatus,
     date: formatDate(o.createdAt),
     time: formatTime(o.createdAt),
-    total: `₹${o.totalAmount}`,
-    totalValue: o.totalAmount,
+    total: `₹${getAdminOrderTotal(o)}`,
+    totalValue: getAdminOrderTotal(o),
     payment: o.paymentMethod,
     fulfillmentType: formatFulfillmentType(o.fulfillmentType),
     raw: {
@@ -433,12 +457,21 @@ const OrderHistory = ({ mode = "all" }) => {
     const filteredRevenue = filteredOrders.reduce((sum, o) => sum + o.totalValue, 0);
     const cancelled = baseOrders.filter((o) => o.raw?.orderStatus === "Cancelled");
     const refunded = baseOrders.filter((o) => o.status === "Refunded");
+    const pendingRefund = cancelled.filter((o) => {
+      const refundMeta = deriveRefundMeta(o.raw);
+      return (
+        refundMeta.refundStatus === "PENDING" &&
+        refundMeta.refundEligibleAmount > 0 &&
+        hasRefundablePrepaidAmount(o.raw)
+      );
+    });
 
     return {
       total: baseOrders.length,
       completed: completed.length,
       cancelled: cancelled.length,
       refunded: refunded.length,
+      pendingRefund: pendingRefund.length,
       revenue,
       filteredTotal: filteredOrders.length,
       filteredRevenue,
@@ -784,7 +817,7 @@ const OrderHistory = ({ mode = "all" }) => {
               />
               <Stat
                 label="Pending Refund"
-                value={Math.max(analytics.cancelled - analytics.refunded, 0)}
+                value={analytics.pendingRefund}
                 blue
               />
             </>
@@ -1067,11 +1100,11 @@ const OrderModal = ({
           <DetailRow label="Total" value={<span className="font-bold">{order.total}</span>} />
           <DetailRow
             label="Wallet Used"
-            value={<span>₹{Number(order.raw.walletUsed || 0).toFixed(2)}</span>}
+            value={<span>₹{asAmount(order.raw.walletUsed).toFixed(2)}</span>}
           />
           <DetailRow
             label="Payable Amount"
-            value={<span>₹{Number(order.raw.payableAmount || 0).toFixed(2)}</span>}
+            value={<span>₹{getAdminPayableAmount(order.raw).toFixed(2)}</span>}
           />
           <DetailRow
             label="Refund"
