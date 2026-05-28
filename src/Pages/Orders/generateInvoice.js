@@ -10,6 +10,13 @@ const asNumber = (value, fallback = 0) => {
 const money = (value) => `Rs. ${asNumber(value).toFixed(2)}`;
 
 const clean = (value) => value?.toString?.().trim?.() ?? "";
+const escapeHtml = (value) =>
+  clean(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
 const buildAddress = (parts = []) => parts.filter(Boolean).join(", ");
 
@@ -76,11 +83,11 @@ const buildItemRows = (orderItems, taxLines) =>
 
     return {
       srNo: index + 1,
-      upc: clean(item.upc || item.sku || "—"),
-      description: `${clean(item.productName || item.name)}${
-        clean(item.varietyName) ? ` (${clean(item.varietyName)})` : ""
+      upc: escapeHtml(item.upc || item.sku || "—"),
+      description: `${escapeHtml(item.productName || item.name)}${
+        clean(item.varietyName) ? ` (${escapeHtml(item.varietyName)})` : ""
       }`,
-      hsnCode: clean(item.hsnCode || taxLine?.hsnCode || "—"),
+      hsnCode: escapeHtml(item.hsnCode || taxLine?.hsnCode || "—"),
       mrp: asNumber(originalPrice * qty),
       discountAmount,
       quantity: qty,
@@ -122,8 +129,12 @@ const buildInvoiceHtml = ({
   const chargeRows = buildChargeRows(order, taxDetails, taxSummary);
   const taxationType = taxDetails.taxationType || "INTRASTATE";
   const amountInWords =
-    clean(taxSummary.amountInWords) ||
-    `${money(order.totalAmount)} Only`;
+    escapeHtml(taxSummary.amountInWords) ||
+    escapeHtml(`${money(order.totalAmount)} Only`);
+  const safeSellerAddress = escapeHtml(sellerAddress || "—");
+  const safePlaceOfSupply = escapeHtml(placeOfSupply || "—");
+  const safeInvoiceNumber = escapeHtml(invoiceNumber);
+  const safeOrderId = escapeHtml(order._id);
 
   const itemsTableRows = itemRows
     .map(
@@ -164,7 +175,7 @@ const buildInvoiceHtml = ({
       (row, index) => `
         <tr>
           <td>${index + 1}</td>
-          <td>${row.label}</td>
+          <td>${escapeHtml(row.label)}</td>
           <td class="num">${asNumber(row.line?.gstRate).toFixed(2)}</td>
           <td class="num">${asNumber(row.line?.cessRate).toFixed(2)}</td>
           <td class="num">${row.taxableValue.toFixed(2)}</td>
@@ -261,56 +272,56 @@ const buildInvoiceHtml = ({
         <div>
           <div class="title">Tax Invoice</div>
           <div class="muted">Sold By / Seller</div>
-          <div style="font-weight:700;font-size:16px;">${clean(
+          <div style="font-weight:700;font-size:16px;">${escapeHtml(
             legalDetails.legalBusinessName || "Hungzo"
           )}</div>
           ${
             clean(legalDetails.tradeName)
-              ? `<div class="muted">${clean(legalDetails.tradeName)}</div>`
+              ? `<div class="muted">${escapeHtml(legalDetails.tradeName)}</div>`
               : ""
           }
           ${
             clean(legalDetails.sellerCode)
-              ? `<div class="muted">${clean(legalDetails.sellerCode)}</div>`
+              ? `<div class="muted">${escapeHtml(legalDetails.sellerCode)}</div>`
               : ""
           }
-          <div>${sellerAddress || "—"}</div>
+          <div>${safeSellerAddress}</div>
           ${
             clean(legalDetails.gstin)
-              ? `<div><strong>GSTIN:</strong> ${clean(legalDetails.gstin)}</div>`
+              ? `<div><strong>GSTIN:</strong> ${escapeHtml(legalDetails.gstin)}</div>`
               : ""
           }
           ${
             clean(legalDetails.fssaiLicenseNumber)
-              ? `<div><strong>FSSAI License Number:</strong> ${clean(
+              ? `<div><strong>FSSAI License Number:</strong> ${escapeHtml(
                   legalDetails.fssaiLicenseNumber
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.cin)
-              ? `<div><strong>CIN:</strong> ${clean(legalDetails.cin)}</div>`
+              ? `<div><strong>CIN:</strong> ${escapeHtml(legalDetails.cin)}</div>`
               : ""
           }
           ${
             clean(legalDetails.pan)
-              ? `<div><strong>PAN:</strong> ${clean(legalDetails.pan)}</div>`
+              ? `<div><strong>PAN:</strong> ${escapeHtml(legalDetails.pan)}</div>`
               : ""
           }
         </div>
 
         <div class="box" style="min-width:320px;">
-          <div><strong>Invoice Number:</strong> ${invoiceNumber}</div>
-          <div><strong>Order ID:</strong> ${clean(order._id)}</div>
+          <div><strong>Invoice Number:</strong> ${safeInvoiceNumber}</div>
+          <div><strong>Order ID:</strong> ${safeOrderId}</div>
           <div><strong>Invoice Date:</strong> ${orderDate.toLocaleDateString(
             "en-IN",
             { day: "2-digit", month: "short", year: "numeric" }
           )}</div>
-          <div><strong>Place of Supply:</strong> ${placeOfSupply || "—"}</div>
+          <div><strong>Place of Supply:</strong> ${safePlaceOfSupply}</div>
           <div><strong>Reverse Charge:</strong> ${
             legalDetails.reverseChargeApplicable ? "Yes" : "No"
           }</div>
-          <div><strong>Payment Method:</strong> ${clean(
+          <div><strong>Payment Method:</strong> ${escapeHtml(
             order.paymentMethod || "N/A"
           )}</div>
         </div>
@@ -319,7 +330,7 @@ const buildInvoiceHtml = ({
       <div class="grid-two section">
         <div class="box">
           <div class="section-title">Invoice To</div>
-          <div><strong>Name:</strong> ${clean(
+          <div><strong>Name:</strong> ${escapeHtml(
             order.userDetails?.gstLegalName ||
               order.userDetails?.name ||
               order.user?.email ||
@@ -327,7 +338,7 @@ const buildInvoiceHtml = ({
           )}</div>
           ${
             clean(order.userDetails?.gstTradeName)
-              ? `<div><strong>Trade Name:</strong> ${clean(
+              ? `<div><strong>Trade Name:</strong> ${escapeHtml(
                   order.userDetails.gstTradeName
                 )}</div>`
               : ""
@@ -336,7 +347,7 @@ const buildInvoiceHtml = ({
             clean(order.userDetails?.gstPrincipalPlaceAddress) ||
             clean(order.userDetails?.gstAddressLine1) ||
             clean(order.userDetails?.address)
-              ? `<div><strong>Address:</strong> ${clean(
+              ? `<div><strong>Address:</strong> ${escapeHtml(
                   order.userDetails?.gstPrincipalPlaceAddress ||
                     [
                       clean(order.userDetails?.gstAddressLine1),
@@ -353,26 +364,26 @@ const buildInvoiceHtml = ({
           }
           ${
             clean(order.userDetails?.gstPincode || order.userDetails?.pincode)
-              ? `<div><strong>Pin code:</strong> ${clean(
+              ? `<div><strong>Pin code:</strong> ${escapeHtml(
                   order.userDetails?.gstPincode || order.userDetails?.pincode
                 )}</div>`
               : ""
           }
           ${
             clean(order.userDetails?.gstState || order.userDetails?.state)
-              ? `<div><strong>State:</strong> ${clean(
+              ? `<div><strong>State:</strong> ${escapeHtml(
                   order.userDetails?.gstState || order.userDetails?.state
                 )}</div>`
               : ""
           }
           ${
             clean(order.userDetails?.phone)
-              ? `<div><strong>Phone:</strong> ${clean(order.userDetails.phone)}</div>`
+              ? `<div><strong>Phone:</strong> ${escapeHtml(order.userDetails.phone)}</div>`
               : ""
           }
           ${
             clean(order.userDetails?.gstNumber)
-              ? `<div><strong>GSTIN:</strong> ${clean(
+              ? `<div><strong>GSTIN:</strong> ${escapeHtml(
                   order.userDetails.gstNumber
                 )}</div>`
               : ""
@@ -381,33 +392,33 @@ const buildInvoiceHtml = ({
 
         <div class="box">
           <div class="section-title">Seller Legal Details</div>
-          <div><strong>Business:</strong> ${clean(
+          <div><strong>Business:</strong> ${escapeHtml(
             legalDetails.legalBusinessName || "Hungzo"
           )}</div>
           ${
             clean(legalDetails.authorizedSignatoryName)
-              ? `<div><strong>Authorised Signatory:</strong> ${clean(
+              ? `<div><strong>Authorised Signatory:</strong> ${escapeHtml(
                   legalDetails.authorizedSignatoryName
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.authorizedSignatoryDesignation)
-              ? `<div><strong>Designation:</strong> ${clean(
+              ? `<div><strong>Designation:</strong> ${escapeHtml(
                   legalDetails.authorizedSignatoryDesignation
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.supportEmail)
-              ? `<div><strong>Support Email:</strong> ${clean(
+              ? `<div><strong>Support Email:</strong> ${escapeHtml(
                   legalDetails.supportEmail
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.supportPhone)
-              ? `<div><strong>Support Phone:</strong> ${clean(
+              ? `<div><strong>Support Phone:</strong> ${escapeHtml(
                   legalDetails.supportPhone
                 )}</div>`
               : ""
