@@ -108,7 +108,7 @@ const BannerList = () => {
       endsAt: banner.endsAt ? new Date(banner.endsAt).toISOString().slice(0, 16) : '',
       isActive: banner.isActive ?? true,
     });
-    setExistingImages(banner.images || []);
+    setExistingImages(Array.isArray(banner.images) ? banner.images.slice(0, 1) : []);
     setSelectedImages([]);
     setImagePreviews([]);
     setFormErrors({});
@@ -221,11 +221,14 @@ const BannerList = () => {
     }
 
     if (validFiles.length > 0) {
-      // Create preview URLs
-      const newPreviews = validFiles.map(file => URL.createObjectURL(file));
-      
-      setSelectedImages(prev => [...prev, ...validFiles]);
-      setImagePreviews(prev => [...prev, ...newPreviews]);
+      if (validFiles.length > 1) {
+        toast("Only one banner image can be uploaded. Using the first selected file.");
+      }
+
+      const newPreview = URL.createObjectURL(validFiles[0]);
+
+      setSelectedImages([validFiles[0]]);
+      setImagePreviews([newPreview]);
       
       // Clear image error if images are added
       if (formErrors.images) {
@@ -237,32 +240,9 @@ const BannerList = () => {
     }
   };
 
-  const removeSelectedImage = (index) => {
-    const newImages = [...selectedImages];
-    const newPreviews = [...imagePreviews];
-    
-    // Revoke the object URL to prevent memory leak
-    URL.revokeObjectURL(newPreviews[index]);
-    
-    newImages.splice(index, 1);
-    newPreviews.splice(index, 1);
-    
-    setSelectedImages(newImages);
-    setImagePreviews(newPreviews);
-  };
-
-  const removeExistingImage = (index) => {
-    const newImages = [...existingImages];
-    newImages.splice(index, 1);
-    setExistingImages(newImages);
-    
-    // Check if we still have images
-    if (newImages.length === 0 && selectedImages.length === 0 && formErrors.images) {
-      setFormErrors(prev => ({
-        ...prev,
-        images: 'At least one image is required'
-      }));
-    }
+  const removeSelectedImage = () => {
+    setSelectedImages([]);
+    setImagePreviews([]);
   };
 
   const handleUpdateBanner = async () => {
@@ -306,22 +286,11 @@ const BannerList = () => {
         formData.append('endsAt', new Date(editFormData.endsAt).toISOString());
       }
 
-      // Append all new images
-      selectedImages.forEach((image) => {
-        formData.append('images', image);
-      });
-
-      console.log('Updating banner with data:', {
-        title: editFormData.title,
-        actionType: editFormData.actionType,
-        actionId: editFormData.actionId,
-        isActive: editFormData.isActive,
-        images: selectedImages.length
-      });
+      if (selectedImages[0]) {
+        formData.append('images', selectedImages[0]);
+      }
 
       const response = await updateBanner(editingBanner._id, formData);
-
-      console.log('Update response:', response);
 
       if (response.ok || response.success) {
         toast.success(response.data?.message || 'Banner updated successfully');
@@ -377,23 +346,13 @@ const BannerList = () => {
     }
   };
 
-  const openImagePreview = (index, type = 'existing') => {
+  const openImagePreview = (index) => {
     setPreviewImageIndex(index);
     setShowImagePreview(true);
   };
 
   const closeImagePreview = () => {
     setShowImagePreview(false);
-  };
-
-  const navigatePreview = (direction) => {
-    const totalImages = existingImages.length + selectedImages.length;
-    let newIndex = previewImageIndex + direction;
-    
-    if (newIndex < 0) newIndex = totalImages - 1;
-    if (newIndex >= totalImages) newIndex = 0;
-    
-    setPreviewImageIndex(newIndex);
   };
 
   // Get submit button disabled state
@@ -863,7 +822,7 @@ const BannerList = () => {
                   {existingImages.length > 0 && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Existing Images ({existingImages.length})
+                        Current Image
                       </label>
                       <div className="flex flex-wrap gap-3">
                         {existingImages.map((image, index) => (
@@ -890,7 +849,7 @@ const BannerList = () => {
                               </div>
                             </div>
                             <div className="text-xs text-center mt-1 text-gray-500">
-                              Image {index + 1}
+                              Current
                             </div>
                           </div>
                         ))}
@@ -901,7 +860,7 @@ const BannerList = () => {
                   {/* Add New Images */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Add New Images
+                      Replace Image
                     </label>
                     <div className="flex flex-wrap gap-3">
                       {/* Image Upload Button */}
@@ -909,14 +868,13 @@ const BannerList = () => {
                         <input
                           type="file"
                           accept="image/*"
-                          multiple
                           onChange={handleImageChange}
                           className="hidden"
                           id="editBannerImages"
                         />
                         <label htmlFor="editBannerImages" className="flex flex-col items-center justify-center w-full h-full cursor-pointer">
                           <Upload className="w-8 h-8 text-gray-400 mb-1" />
-                          <span className="text-xs text-gray-500 text-center px-2">Upload Images</span>
+                          <span className="text-xs text-gray-500 text-center px-2">Upload Image</span>
                         </label>
                       </div>
 
@@ -926,7 +884,7 @@ const BannerList = () => {
                           <div className="w-28 h-20 rounded-md overflow-hidden border border-gray-200 bg-gray-50">
                             <img
                               src={imagePreviews[index]}
-                              alt={`New ${index + 1}`}
+                              alt="Replacement preview"
                               className="w-full h-full object-cover"
                             />
                             <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
@@ -940,7 +898,7 @@ const BannerList = () => {
                               </button>
                               <button
                                 type="button"
-                                onClick={() => removeSelectedImage(index)}
+                                onClick={removeSelectedImage}
                                 className="p-1 bg-red-500 text-white rounded-full m-1 hover:bg-red-600 transition-all"
                                 title="Remove"
                               >
@@ -949,13 +907,13 @@ const BannerList = () => {
                             </div>
                           </div>
                           <div className="text-xs text-center mt-1 text-gray-500">
-                            New {index + 1}
+                            Replacement
                           </div>
                         </div>
                       ))}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      Max 5MB per image. Supports JPG, PNG, GIF
+                      One image only. Max 5MB. Supports JPG, PNG, WebP.
                     </p>
                     {formErrors.images && (
                       <p className="mt-1 text-xs text-red-600 flex items-center">
@@ -970,21 +928,21 @@ const BannerList = () => {
                     <div className="text-sm font-medium text-gray-700 mb-2">Image Summary</div>
                     <div className="text-xs text-gray-600 space-y-1">
                       <div className="flex justify-between">
-                        <span>Existing images:</span>
+                        <span>Current image:</span>
                         <span className={`font-medium ${existingImages.length === 0 ? 'text-red-600' : 'text-gray-900'}`}>
                           {existingImages.length}
                           {existingImages.length === 0 && ' (Required)'}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span>New images to add:</span>
+                        <span>Replacement image:</span>
                         <span className="font-medium text-blue-600">{selectedImages.length}</span>
                       </div>
                       <div className="flex justify-between border-t pt-1">
                         <span>Total after update:</span>
-                        <span className={`font-medium ${(existingImages.length + selectedImages.length) === 0 ? 'text-red-600' : 'text-green-600'}`}>
-                          {existingImages.length + selectedImages.length}
-                          {(existingImages.length + selectedImages.length) === 0 && ' (At least 1 required)'}
+                        <span className={`font-medium ${((selectedImages.length > 0 ? selectedImages.length : existingImages.length) === 0) ? 'text-red-600' : 'text-green-600'}`}>
+                          {selectedImages.length > 0 ? selectedImages.length : existingImages.length}
+                          {((selectedImages.length > 0 ? selectedImages.length : existingImages.length) === 0) && ' (At least 1 required)'}
                         </span>
                       </div>
                     </div>
@@ -1053,7 +1011,7 @@ const BannerList = () => {
         </div>
       )}
 
-      {/* Image Preview Modal */}
+            {/* Image Preview Modal */}
       {showImagePreview && (
         <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center p-4 z-[60]">
           <div className="relative max-w-4xl max-h-[90vh]">
@@ -1062,24 +1020,6 @@ const BannerList = () => {
               className="absolute top-4 right-4 text-white hover:text-gray-300 z-10"
             >
               <X className="w-8 h-8" />
-            </button>
-            
-            {/* Navigation Buttons */}
-            <button
-              onClick={() => navigatePreview(-1)}
-              className="absolute left-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            <button
-              onClick={() => navigatePreview(1)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white hover:text-gray-300 z-10"
-            >
-              <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-              </svg>
             </button>
             
             {/* Current Image */}
@@ -1098,7 +1038,7 @@ const BannerList = () => {
             
             {/* Image Counter */}
             <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-white bg-black bg-opacity-50 px-4 py-2 rounded-full text-sm">
-              {previewImageIndex + 1} / {existingImages.length + selectedImages.length}
+              1 / {Math.max(existingImages.length, selectedImages.length, 1)}
             </div>
           </div>
         </div>

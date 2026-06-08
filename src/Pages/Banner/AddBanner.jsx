@@ -23,17 +23,22 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
   const [form, setForm] = useState(createInitialForm);
   const [categories, setCategories] = useState([]);
   const [products, setProducts] = useState([]);
-  const [selectedImages, setSelectedImages] = useState([]);
-  const [imagePreviews, setImagePreviews] = useState([]);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     loadReferenceData();
-    return () => {
-      imagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
-    };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (imagePreview) {
+        URL.revokeObjectURL(imagePreview);
+      }
+    };
+  }, [imagePreview]);
 
   const actionOptions = useMemo(
     () => [
@@ -69,7 +74,7 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
           : [];
         setProducts(nextProducts);
       }
-    } catch (_error) {
+    } catch {
       toast.error("Failed to load banner references");
     } finally {
       setLoading(false);
@@ -130,28 +135,26 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
       toast.error("Only image files up to 5MB are allowed");
     }
 
-    const nextFiles = [...selectedImages, ...validFiles].slice(0, 5);
-    const nextPreviews = nextFiles.map((file) => URL.createObjectURL(file));
+    const nextFile = validFiles[0];
+    if (!nextFile) return;
 
-    imagePreviews.forEach((preview) => URL.revokeObjectURL(preview));
-    setSelectedImages(nextFiles);
-    setImagePreviews(nextPreviews);
+    if (validFiles.length > 1) {
+      toast("Only one banner image can be uploaded. Using the first selected file.");
+    }
+
+    setSelectedImage(nextFile);
+    setImagePreview(URL.createObjectURL(nextFile));
     event.target.value = "";
   };
 
-  const removeImage = (index) => {
-    const nextFiles = selectedImages.filter((_, fileIndex) => fileIndex != index);
-    const nextPreviews = imagePreviews.filter((_, previewIndex) => previewIndex != index);
-    if (imagePreviews[index]) {
-      URL.revokeObjectURL(imagePreviews[index]);
-    }
-    setSelectedImages(nextFiles);
-    setImagePreviews(nextPreviews);
+  const removeImage = () => {
+    setSelectedImage(null);
+    setImagePreview("");
   };
 
   const validateForm = () => {
     if (!form.title.trim()) return "Banner title is required";
-    if (selectedImages.length === 0) return "Select at least one banner image";
+    if (!selectedImage) return "Select one banner image";
     if (form.actionType === "CATEGORY" && !form.actionId) {
       return "Select a category";
     }
@@ -202,9 +205,7 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
         formData.append("targetUrl", form.targetUrl.trim());
       }
 
-      selectedImages.forEach((file) => {
-        formData.append("images", file);
-      });
+      formData.append("images", selectedImage);
 
       const response = await createBanner(formData);
 
@@ -390,34 +391,33 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
             <h3 className="mb-4 text-lg font-semibold text-slate-900">Media</h3>
             <input
               type="file"
-              multiple
               accept="image/*"
               onChange={handleImageChange}
               className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-emerald-700`}
             />
             <p className="mt-2 text-xs text-slate-400">
-              Upload up to 5 images. The first one becomes the banner cover in the app.
+              Upload one image. This is the exact banner shown in the app.
             </p>
 
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {imagePreviews.map((preview, index) => (
-                <div key={preview} className="relative overflow-hidden rounded-2xl border border-slate-200">
-                  <img src={preview} alt="" className="h-28 w-full object-cover" />
-                  {index === 0 && (
-                    <span className="absolute left-2 top-2 rounded-full bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
-                      Cover
-                    </span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => removeImage(index)}
-                    className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-600"
-                  >
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
+            {imagePreview ? (
+              <div className="mt-4 relative overflow-hidden rounded-2xl border border-slate-200">
+                <img src={imagePreview} alt="Banner preview" className="h-40 w-full object-cover" />
+                <span className="absolute left-2 top-2 rounded-full bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
+                  Preview
+                </span>
+                <button
+                  type="button"
+                  onClick={removeImage}
+                  className="absolute right-2 top-2 rounded-full bg-white/90 px-2 py-1 text-xs font-semibold text-rose-600"
+                >
+                  Remove
+                </button>
+              </div>
+            ) : (
+              <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                No image selected yet.
+              </div>
+            )}
           </section>
 
           <div className="flex gap-3">
