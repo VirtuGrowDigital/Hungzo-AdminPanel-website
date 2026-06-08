@@ -1090,7 +1090,14 @@ export async function createBanner(formData) {
 
     return {
       ok: false,
-      message: error.response?.data?.message || error.response?.data?.error || "Failed to create banner",
+      message:
+        error.response?.status === 413
+          ? "Banner image is too large. Please keep it under 5MB."
+          : error.response?.data?.message ||
+            error.response?.data?.error ||
+            (error.code === "ERR_NETWORK"
+              ? "Request blocked by CORS or the server is unreachable."
+              : "Failed to create banner"),
       error: error.response?.data,
     };
   }
@@ -1149,7 +1156,14 @@ export async function updateBanner(id, formData) {
 
     return {
       ok: false,
-      message: error.response?.data?.message || "Failed to update banner",
+      message:
+        error.response?.status === 413
+          ? "Banner image is too large. Please keep it under 5MB."
+          : error.response?.data?.message ||
+            error.response?.data?.error ||
+            (error.code === "ERR_NETWORK"
+              ? "Request blocked by CORS or the server is unreachable."
+              : "Failed to update banner"),
     };
   }
 }

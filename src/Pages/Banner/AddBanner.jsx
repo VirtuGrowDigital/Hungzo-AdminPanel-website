@@ -151,6 +151,8 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
 
     if (invalidFiles.length > 0) {
       const message = invalidFiles[0];
+      setSelectedImage(null);
+      setImagePreview("");
       setFormErrors((prev) => ({
         ...prev,
         images: message,
