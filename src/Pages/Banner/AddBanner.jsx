@@ -25,6 +25,7 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
   const [products, setProducts] = useState([]);
   const [selectedImage, setSelectedImage] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [formErrors, setFormErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -121,25 +122,57 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
       ...prev,
       [name]: type === "checkbox" ? checked : value,
     }));
+
+    if (formErrors[name]) {
+      setFormErrors((prev) => ({
+        ...prev,
+        [name]: "",
+      }));
+    }
   };
 
   const handleImageChange = (event) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
-    const validFiles = files.filter(
-      (file) => file.type.startsWith("image/") && file.size <= 5 * 1024 * 1024
-    );
+    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
+    const validFiles = [];
+    const invalidFiles = [];
 
-    if (validFiles.length !== files.length) {
-      toast.error("Only image files up to 5MB are allowed");
+    files.forEach((file) => {
+      if (!allowedTypes.has(file.type)) {
+        invalidFiles.push(`${file.name} must be JPG, PNG, or WEBP`);
+      } else if (file.size > 5 * 1024 * 1024) {
+        invalidFiles.push(`${file.name} exceeds 5MB`);
+      } else {
+        validFiles.push(file);
+      }
+    });
+
+    if (invalidFiles.length > 0) {
+      const message = invalidFiles[0];
+      setFormErrors((prev) => ({
+        ...prev,
+        images: message,
+      }));
+      toast.error(message);
+    } else if (formErrors.images) {
+      setFormErrors((prev) => ({
+        ...prev,
+        images: "",
+      }));
     }
 
     const nextFile = validFiles[0];
     if (!nextFile) return;
 
     if (validFiles.length > 1) {
-      toast("Only one banner image can be uploaded. Using the first selected file.");
+      const message = "Only one banner image can be uploaded.";
+      setFormErrors((prev) => ({
+        ...prev,
+        images: message,
+      }));
+      toast(message);
     }
 
     setSelectedImage(nextFile);
@@ -150,32 +183,64 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
   const removeImage = () => {
     setSelectedImage(null);
     setImagePreview("");
+    if (formErrors.images) {
+      setFormErrors((prev) => ({
+        ...prev,
+        images: "",
+      }));
+    }
   };
 
   const validateForm = () => {
-    if (!form.title.trim()) return "Banner title is required";
-    if (!selectedImage) return "Select one banner image";
+    const errors = {};
+
+    if (!form.title.trim()) errors.title = "Banner title is required";
+    if (!selectedImage) errors.images = "Select one banner image";
     if (form.actionType === "CATEGORY" && !form.actionId) {
-      return "Select a category";
+      errors.actionId = "Select a category";
     }
     if (form.actionType === "PRODUCT" && !form.actionId) {
-      return "Select a product";
+      errors.actionId = "Select a product";
     }
     if (form.actionType === "URL" && !/^https?:\/\//i.test(form.targetUrl.trim())) {
-      return "Target URL must start with http:// or https://";
+      errors.targetUrl = "Target URL must start with http:// or https://";
     }
     if (form.startsAt && form.endsAt && form.startsAt > form.endsAt) {
-      return "Start time cannot be after end time";
+      errors.endsAt = "Start time cannot be after end time";
     }
-    return null;
+
+    setFormErrors(errors);
+    return errors;
+  };
+
+  const applyServerErrors = (response) => {
+    const payload = response?.error || response;
+    const nextErrors = {};
+
+    if (payload?.errors && typeof payload.errors === "object") {
+      Object.assign(nextErrors, payload.errors);
+    }
+
+    if (!nextErrors.form && payload?.message) {
+      nextErrors.form = payload.message;
+    }
+
+    setFormErrors((prev) => ({
+      ...prev,
+      ...nextErrors,
+    }));
+
+    return {
+      message: payload?.message || "Failed to create banner",
+      hasFieldErrors: Object.keys(nextErrors).some((key) => key !== "form" && nextErrors[key]),
+    };
   };
 
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    const validationMessage = validateForm();
-    if (validationMessage) {
-      toast.error(validationMessage);
+    const validationErrors = validateForm();
+    if (Object.keys(validationErrors).length > 0) {
       return;
     }
 
@@ -210,9 +275,14 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
       const response = await createBanner(formData);
 
       if (!response?.ok) {
-        throw new Error(response?.message || "Failed to create banner");
+        const { message, hasFieldErrors } = applyServerErrors(response);
+        if (!hasFieldErrors) {
+          toast.error(message);
+        }
+        return;
       }
 
+      setFormErrors({});
       toast.success("Banner created successfully");
       if (onBannerCreated) {
         onBannerCreated(response.data?.banner);
@@ -299,6 +369,9 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
                 onChange={handleChange}
                 className={inputClass}
               />
+              {formErrors.title && (
+                <p className="text-xs text-rose-600">{formErrors.title}</p>
+              )}
               <input
                 type="text"
                 name="subtitle"
@@ -314,6 +387,11 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
                 onChange={handleChange}
                 className={`${inputClass} min-h-28`}
               />
+              {formErrors.form && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {formErrors.form}
+                </div>
+              )}
             </div>
           </section>
 
@@ -336,6 +414,16 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
               </div>
 
               <div className="md:col-span-2">{renderActionField()}</div>
+              {formErrors.actionId && (
+                <p className="md:col-span-2 -mt-2 text-xs text-rose-600">
+                  {formErrors.actionId}
+                </p>
+              )}
+              {formErrors.targetUrl && (
+                <p className="md:col-span-2 -mt-2 text-xs text-rose-600">
+                  {formErrors.targetUrl}
+                </p>
+              )}
 
               <input
                 type="number"
@@ -381,6 +469,9 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
                   onChange={handleChange}
                   className={inputClass}
                 />
+                {formErrors.endsAt && (
+                  <p className="mt-1 text-xs text-rose-600">{formErrors.endsAt}</p>
+                )}
               </div>
             </div>
           </section>
@@ -391,13 +482,16 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
             <h3 className="mb-4 text-lg font-semibold text-slate-900">Media</h3>
             <input
               type="file"
-              accept="image/*"
+              accept="image/jpeg,image/png,image/webp"
               onChange={handleImageChange}
               className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-emerald-700`}
             />
             <p className="mt-2 text-xs text-slate-400">
-              Upload one image. This is the exact banner shown in the app.
+              Upload one JPG, PNG, or WEBP image up to 5MB. This is the exact banner shown in the app.
             </p>
+            {formErrors.images && (
+              <p className="mt-2 text-xs text-rose-600">{formErrors.images}</p>
+            )}
 
             {imagePreview ? (
               <div className="mt-4 relative overflow-hidden rounded-2xl border border-slate-200">
