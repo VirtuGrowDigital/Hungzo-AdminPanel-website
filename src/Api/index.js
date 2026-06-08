@@ -210,6 +210,40 @@ export async function getUserProfiles() {
   }
 }
 
+export async function exportUserProfiles(params = {}) {
+  try {
+    const res = await API.get("/admin/dashboard/users/profiles/export", {
+      params,
+      responseType: "blob",
+    });
+
+    return {
+      ok: true,
+      blob: res.data,
+      contentDisposition: res.headers["content-disposition"] || "",
+    };
+  } catch (error) {
+    let message = "Failed to export user profiles";
+
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const parsed = JSON.parse(text);
+        message = parsed?.message || message;
+      } catch (_) {
+        // Keep the fallback message when the server returns a binary body.
+      }
+    } else {
+      message = error.response?.data?.message || message;
+    }
+
+    return {
+      ok: false,
+      message,
+    };
+  }
+}
+
 export async function getStoreSettings() {
   try {
     const res = await API.get("/admin/store-settings");
