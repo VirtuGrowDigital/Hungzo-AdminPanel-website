@@ -25,6 +25,7 @@ import {
   fetchProductReviewsAdmin,
   updateProductReviewStatus,
 } from "../../Api";
+import { PUBLIC_PRODUCT_DEFAULT_IMAGE_URL } from "../../utils/publicAssets";
 import ProductSectionTabs from "./ProductSectionTabs";
 
 const createVarietyId = () =>
@@ -68,8 +69,7 @@ const getProductFromResponse = (payload) =>
   payload?.product ?? payload?.data?.product ?? null;
 const LEGACY_PRODUCT_IMAGE_URL =
   "https://via.placeholder.com/600x600?text=Hungzo+Product";
-const DEFAULT_PRODUCT_IMAGE_URL =
-  "https://api.hungzo.in/assets/logo/hungzo-product-default.svg";
+const DEFAULT_PRODUCT_IMAGE_URL = PUBLIC_PRODUCT_DEFAULT_IMAGE_URL;
 const isDefaultProductImage = (value = "") =>
   value === DEFAULT_PRODUCT_IMAGE_URL || value === LEGACY_PRODUCT_IMAGE_URL;
 const extractImageUrl = (value) => {
