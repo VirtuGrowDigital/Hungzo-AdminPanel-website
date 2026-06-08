@@ -2,6 +2,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { createBanner, fetchCategories, myProducts } from "../../Api";
+import {
+  ALLOWED_BANNER_IMAGE_MIME_TYPES,
+  MAX_BANNER_IMAGE_SIZE_MB,
+  MAX_BANNER_IMAGE_SIZE_BYTES,
+} from "../../constants/banner";
 
 const createInitialForm = () => ({
   title: "",
@@ -135,15 +140,14 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
 
-    const allowedTypes = new Set(["image/jpeg", "image/png", "image/webp"]);
     const validFiles = [];
     const invalidFiles = [];
 
     files.forEach((file) => {
-      if (!allowedTypes.has(file.type)) {
+      if (!ALLOWED_BANNER_IMAGE_MIME_TYPES.has(file.type)) {
         invalidFiles.push(`${file.name} must be JPG, PNG, or WEBP`);
-      } else if (file.size > 5 * 1024 * 1024) {
-        invalidFiles.push(`${file.name} exceeds 5MB`);
+      } else if (file.size > MAX_BANNER_IMAGE_SIZE_BYTES) {
+        invalidFiles.push(`${file.name} exceeds ${MAX_BANNER_IMAGE_SIZE_MB}MB`);
       } else {
         validFiles.push(file);
       }
@@ -489,7 +493,7 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
               className={`${inputClass} file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-emerald-700`}
             />
             <p className="mt-2 text-xs text-slate-400">
-              Upload one JPG, PNG, or WEBP image up to 5MB. This is the exact banner shown in the app.
+              Upload one JPG, PNG, or WEBP image up to {MAX_BANNER_IMAGE_SIZE_MB}MB. This is the exact banner shown in the app.
             </p>
             {formErrors.images && (
               <p className="mt-2 text-xs text-rose-600">{formErrors.images}</p>
