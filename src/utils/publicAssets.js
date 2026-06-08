@@ -14,5 +14,5 @@ export const getPublicAssetUrl = (assetPath = "") => {
 };
 
 export const PUBLIC_PRODUCT_DEFAULT_IMAGE_URL = getPublicAssetUrl(
-  "assets/logo/hungzo-product-default.svg"
+  "assets/logo/hungzo-product-default.png"
 );
