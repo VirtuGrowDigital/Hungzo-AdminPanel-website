@@ -3,6 +3,11 @@ import { BannersList, DeleteBanner, updateBanner } from '../../Api';
 import { fetchCategories, myProducts } from '../../Api';
 import { toast } from 'react-hot-toast';
 import { X, Upload, Image as ImageIcon, Trash2, Check, Eye, AlertCircle } from 'lucide-react';
+import {
+  ALLOWED_BANNER_IMAGE_MIME_TYPES,
+  MAX_BANNER_IMAGE_SIZE_MB,
+  MAX_BANNER_IMAGE_SIZE_BYTES,
+} from '../../constants/banner';
 
 const BannerList = () => {
   const [banners, setBanners] = useState([]);
@@ -207,10 +212,10 @@ const BannerList = () => {
     const invalidFiles = [];
 
     files.forEach(file => {
-      if (!file.type.match('image.*')) {
-        invalidFiles.push(`${file.name} - Not an image file`);
-      } else if (file.size > 5 * 1024 * 1024) {
-        invalidFiles.push(`${file.name} - Size exceeds 5MB`);
+      if (!ALLOWED_BANNER_IMAGE_MIME_TYPES.has(file.type)) {
+        invalidFiles.push(`${file.name} - Only JPG, PNG, or WEBP images are allowed`);
+      } else if (file.size > MAX_BANNER_IMAGE_SIZE_BYTES) {
+        invalidFiles.push(`${file.name} - Size exceeds ${MAX_BANNER_IMAGE_SIZE_MB}MB`);
       } else {
         validFiles.push(file);
       }
@@ -867,7 +872,7 @@ const BannerList = () => {
                       <div className="w-28 h-20 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/jpeg,image/png,image/webp"
                           onChange={handleImageChange}
                           className="hidden"
                           id="editBannerImages"
@@ -913,7 +918,7 @@ const BannerList = () => {
                       ))}
                     </div>
                     <p className="text-xs text-gray-500 mt-2">
-                      One image only. Max 5MB. Supports JPG, PNG, WebP.
+                      One image only. Max {MAX_BANNER_IMAGE_SIZE_MB}MB. Supports JPG, PNG, WebP.
                     </p>
                     {formErrors.images && (
                       <p className="mt-1 text-xs text-red-600 flex items-center">

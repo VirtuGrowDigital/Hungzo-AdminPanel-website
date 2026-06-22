@@ -2,8 +2,9 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
   getUserProfiles,
+  exportUserProfiles,
 } from "../../Api";
-import { Eye, Store, Wallet, X } from "lucide-react";
+import { Download, Eye, RefreshCw, Store, Wallet, X } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "../../Context/AuthProvider";
 import { AdminHero, AdminPage, AdminPanel, AdminSearchField } from "../../Components/AdminPrimitives";
@@ -13,20 +14,60 @@ const Restaurant = () => {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [exportLoading, setExportLoading] = useState(false);
 
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "SUPERADMIN";
 
   // ================= FETCH =================
   const fetchUserProfiles = async () => {
+    setLoading(true);
     try {
       const res = await getUserProfiles();
+      if (res?.ok === false || res?.success === false) {
+        toast.error(res?.message || "Failed to load user profiles");
+        setUsers([]);
+        return;
+      }
+
       const data = res?.users || res?.data?.users || [];
       setUsers(data);
     } catch {
       toast.error("Failed to load user profiles");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportUsers = async () => {
+    setExportLoading(true);
+    try {
+      const params = {};
+      if (searchTerm.trim()) {
+        params.search = searchTerm.trim();
+      }
+
+      const result = await exportUserProfiles(params);
+
+      if (!result.ok) {
+        toast.error(result.message || "Failed to export user profiles");
+        return;
+      }
+
+      const blobUrl = window.URL.createObjectURL(result.blob);
+      const anchor = document.createElement("a");
+      anchor.href = blobUrl;
+
+      const match = /filename="([^"]+)"/i.exec(result.contentDisposition || "");
+      anchor.download = match?.[1] || `users-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success("User export downloaded");
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -63,6 +104,27 @@ const Restaurant = () => {
         description="Review production user profiles, open wallet details, and jump into customer orders from one clean directory."
         icon={Store}
         meta={`${users.length} users`}
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={fetchUserProfiles}
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/15"
+            >
+              <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Refresh
+            </button>
+            <button
+              type="button"
+              onClick={handleExportUsers}
+              disabled={exportLoading}
+              className="inline-flex items-center gap-2 rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className={`h-4 w-4 ${exportLoading ? "animate-bounce" : ""}`} />
+              {exportLoading ? "Exporting..." : "Export CSV"}
+            </button>
+          </div>
+        }
       />
 
       <AdminSearchField
@@ -70,6 +132,16 @@ const Restaurant = () => {
         onChange={(e) => setSearchTerm(e.target.value)}
         placeholder="Search by name, phone, or email..."
       />
+
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+        <span>
+          Showing <span className="font-semibold text-slate-900">{filteredUsers.length}</span> of{" "}
+          <span className="font-semibold text-slate-900">{users.length}</span> users
+        </span>
+        <span className="text-xs uppercase tracking-[0.2em] text-slate-400">
+          Export respects the current search
+        </span>
+      </div>
 
       <AdminPanel className="h-[70vh] overflow-y-auto">
         <table className="w-full text-sm">

@@ -11,7 +11,7 @@ import {
   EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 
-/* 🔒 Password Strength Helper */
+/* 🔒 Password Strength Helper  */
 const getPasswordStrength = (password) => {
   if (!password) return null;
 

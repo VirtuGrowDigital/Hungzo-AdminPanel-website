@@ -25,6 +25,7 @@ import {
   fetchProductReviewsAdmin,
   updateProductReviewStatus,
 } from "../../Api";
+import { PUBLIC_PRODUCT_DEFAULT_IMAGE_URL } from "../../utils/publicAssets";
 import ProductSectionTabs from "./ProductSectionTabs";
 
 const createVarietyId = () =>
@@ -39,7 +40,6 @@ const createEmptyVariety = () => ({
 });
 
 const toSafeArray = (value) => (Array.isArray(value) ? value : []);
-const toSearchableText = (value) => value?.toString().trim().toLowerCase() ?? "";
 const formatCurrency = (value) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue)
@@ -69,6 +69,9 @@ const getProductFromResponse = (payload) =>
   payload?.product ?? payload?.data?.product ?? null;
 const LEGACY_PRODUCT_IMAGE_URL =
   "https://via.placeholder.com/600x600?text=Hungzo+Product";
+const DEFAULT_PRODUCT_IMAGE_URL = PUBLIC_PRODUCT_DEFAULT_IMAGE_URL;
+const isDefaultProductImage = (value = "") =>
+  value === DEFAULT_PRODUCT_IMAGE_URL || value === LEGACY_PRODUCT_IMAGE_URL;
 const extractImageUrl = (value) => {
   if (!value) return "";
 
@@ -226,6 +229,34 @@ const normalizeProductImages = (product = {}) => {
   return images;
 };
 
+const getEditableProductImages = (product = {}, selectedImages = []) => {
+  const images = normalizeProductImages(product);
+  const realImages = images.filter((image) => !isDefaultProductImage(image));
+  const primaryImage = extractImageUrl(product.primaryImage);
+
+  if (realImages.length > 0) {
+    if (
+      primaryImage &&
+      !isDefaultProductImage(primaryImage) &&
+      realImages.includes(primaryImage)
+    ) {
+      return [primaryImage, ...realImages.filter((image) => image !== primaryImage)];
+    }
+
+    return realImages;
+  }
+
+  if (selectedImages.length > 0) {
+    return [];
+  }
+
+  return images.length > 0 ? images : [DEFAULT_PRODUCT_IMAGE_URL];
+};
+
+const getEditableImageCount = (product = {}, selectedImages = []) =>
+  normalizeProductImages(product).filter((image) => !isDefaultProductImage(image)).length +
+  selectedImages.length;
+
 const normalizeProductForEdit = (product) => ({
   ...product,
   category: getProductCategoryId(product),
@@ -260,8 +291,6 @@ const normalizeProductForEdit = (product) => ({
 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
-const DEFAULT_PRODUCT_IMAGE_URL =
-  "https://hungzo-product-images.s3.ap-south-1.amazonaws.com/defaults/hungzo-product-default.png";
 const unitOptions = ["kg", "g", "l", "ml", "pcs", "packs", "boxes", "jars", "bottles", "cans"];
 const storageOptions = [
   { value: "ambient", label: "Ambient" },
@@ -581,8 +610,7 @@ export default function ProductsList() {
       toast.error("Only JPG, PNG, or WEBP images up to 5MB are allowed");
     }
 
-    const currentImageCount =
-      (editingProduct?.images?.length || 0) + selectedImages.length;
+    const currentImageCount = getEditableImageCount(editingProduct, selectedImages);
     const remainingSlots = Math.max(0, MAX_PRODUCT_IMAGES - currentImageCount);
     const acceptedFiles = validFiles.slice(0, remainingSlots);
 
@@ -680,6 +708,11 @@ export default function ProductsList() {
   const moveSelectedImage = (index, direction) => {
     setSelectedImages((prev) => moveItem(prev, index, index + direction));
   };
+
+  const editableExistingImages = useMemo(
+    () => getEditableProductImages(editingProduct || {}, selectedImages),
+    [editingProduct, selectedImages]
+  );
 
   const setPrimaryImage = (imageReference) => {
     setEditingProduct((prev) =>
@@ -827,10 +860,13 @@ export default function ProductsList() {
 
       const validVarieties = getValidVarieties(editingProduct.varieties);
       formData.append("varieties", JSON.stringify(validVarieties));
-      formData.append("retainImages", JSON.stringify(editingProduct.images || []));
+      formData.append(
+        "retainImages",
+        JSON.stringify(editableExistingImages)
+      );
 
       const imageOrder = [
-        ...(editingProduct.images || []),
+        ...editableExistingImages,
         ...selectedImages.map((_, index) => getUploadReference(index)),
       ];
       formData.append("imageOrder", JSON.stringify(imageOrder));
@@ -2002,15 +2038,15 @@ export default function ProductsList() {
                         </p>
                       </div>
 
-                      {(editingProduct.images?.length > 0 || selectedImages.length > 0) && (
+                      {(editableExistingImages.length > 0 || selectedImages.length > 0) && (
                         <div className="space-y-4">
-                          {editingProduct.images?.length > 0 && (
+                          {editableExistingImages.length > 0 && (
                             <div>
                               <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">
                                 Existing images
                               </p>
                               <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-                                {editingProduct.images.map((image, index) => (
+                                {editableExistingImages.map((image, index) => (
                                   <div
                                     key={`${image}-${index}`}
                                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
@@ -2057,7 +2093,7 @@ export default function ProductsList() {
                                           </button>
                                           <button
                                             type="button"
-                                            disabled={index === editingProduct.images.length - 1}
+                                            disabled={index === editableExistingImages.length - 1}
                                             onClick={() => moveExistingImage(index, 1)}
                                             className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                                           >
