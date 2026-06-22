@@ -105,6 +105,29 @@ const superAdminMenu = [
   { to: "/logout", label: "Logout", icon: ArrowRightOnRectangleIcon },
 ];
 
+const subAdminMenu = [
+  {
+    label: "Products",
+    icon: CubeIcon,
+    children: [
+      { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
+      { to: "/product/add", label: "Add Products", icon: CubeIcon },
+      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
+      { to: "/product/categories", label: "Category Management", icon: CubeIcon },
+    ],
+  },
+  {
+    to: "/orders",
+    label: "Orders",
+    icon: ClipboardDocumentListIcon,
+  },
+  {
+    to: "/logout",
+    label: "Logout",
+    icon: ArrowRightOnRectangleIcon,
+  },
+];
+
 const buildMenuSections = (menuItems) => {
   const primary = [];
   const operations = [];
@@ -158,14 +181,12 @@ function ParentGroup({ item, pathname }) {
   return (
     <div className="space-y-1.5">
       <div
-        className={`flex items-center gap-3 rounded-2xl px-3 py-2 transition ${
-          isActiveGroup ? "bg-white/10 text-white" : "text-white/72"
-        }`}
+        className={`flex items-center gap-3 rounded-2xl px-3 py-2 transition ${isActiveGroup ? "bg-white/10 text-white" : "text-white/72"
+          }`}
       >
         <div
-          className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-            isActiveGroup ? "bg-emerald-500 text-white" : "bg-white/8 text-white/70"
-          }`}
+          className={`flex h-8 w-8 items-center justify-center rounded-xl ${isActiveGroup ? "bg-emerald-500 text-white" : "bg-white/8 text-white/70"
+            }`}
         >
           <Icon className="h-4 w-4" />
         </div>
@@ -182,10 +203,9 @@ function ParentGroup({ item, pathname }) {
               key={child.to}
               to={child.to}
               className={({ isActive }) =>
-                `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
-                  isActive
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-white/62 hover:bg-white/7 hover:text-white"
+                `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${isActive
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-white/62 hover:bg-white/7 hover:text-white"
                 }`
               }
             >
@@ -207,17 +227,15 @@ function SingleLink({ item }) {
     <NavLink
       to={item.to}
       className={({ isActive }) =>
-        `group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition ${
-          isActive
-            ? "bg-white text-slate-900 shadow-sm"
-            : "text-white/72 hover:bg-white/7 hover:text-white"
+        `group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition ${isActive
+          ? "bg-white text-slate-900 shadow-sm"
+          : "text-white/72 hover:bg-white/7 hover:text-white"
         }`
       }
     >
       <div
-        className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-          item.to === "/logout" ? "bg-rose-500/14 text-rose-200" : "bg-white/8 text-current"
-        }`}
+        className={`flex h-8 w-8 items-center justify-center rounded-xl ${item.to === "/logout" ? "bg-rose-500/14 text-rose-200" : "bg-white/8 text-current"
+          }`}
       >
         <Icon className="h-4 w-4" />
       </div>
@@ -238,10 +256,17 @@ export default function Sidebar() {
       ? superAdminMenu
       : user.role === "ADMIN"
         ? adminMenu
-        : [];
+        : user.role === "SUBADMIN"
+          ? subAdminMenu
+          : [];
 
   const sections = useMemo(() => buildMenuSections(menuItems), [menuItems]);
-  const roleLabel = user.role === "SUPERADMIN" ? "Signed in as Super Admin" : "Signed in as Admin";
+  const roleLabel =
+    user.role === "SUPERADMIN"
+      ? "Signed in as Super Admin"
+      : user.role === "SUBADMIN"
+        ? "Signed in as Sub Admin"
+        : "Signed in as Admin";
 
   return (
     <aside className="sticky top-0 h-screen w-64 shrink-0 overflow-hidden border-r border-slate-800/80 bg-[linear-gradient(180deg,#0b1220_0%,#0f172a_52%,#111827_100%)] px-4 py-4 text-white">

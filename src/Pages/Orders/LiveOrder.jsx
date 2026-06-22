@@ -128,7 +128,10 @@ const LiveOrderTable = () => {
     try {
       let res;
 
-      if (userRole === "SUPERADMIN") {
+      if (
+        userRole === "SUPERADMIN" ||
+        userRole === "SUBADMIN"
+      ) {
         res = await getAllOrders();
       } else if (userRole === "ADMIN") {
         res = await getAdminOrders();

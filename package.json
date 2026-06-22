@@ -13,7 +13,7 @@
     "@heroicons/react": "^2.2.0",
     "@tailwindcss/vite": "^4.1.17",
     "axios": "^1.12.2",
-    "date-fns": "^4.1.0",
+    "date-fns": "^4.4.0",
     "firebase": "^12.10.0",
     "framer-motion": "^12.23.26",
     "html2canvas": "^1.4.1",
