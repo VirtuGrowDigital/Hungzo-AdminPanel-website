@@ -1,9 +1,8 @@
 import axios from "axios";
 
-const API_BASE = "https://api.hungzo.in";
-// const API_BASE = "http://192.168.1.61:4000";
+// const API_BASE = "https://api.hungzo.in";
+const API_BASE = "http://192.168.1.57:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
-
 
 const API = axios.create({
   baseURL: API_BASE,
@@ -53,8 +52,8 @@ function getSharedGetRequest(key, requestFactory, cacheMs = 1000) {
   return promise;
 }
 
-  // Attach token automatically
-  API.interceptors.request.use((config) => {
+// Attach token automatically
+API.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -72,8 +71,7 @@ export async function createAdmin(formData) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to create admin",
+      message: error.response?.data?.message || "Failed to create admin",
     };
   }
 }
@@ -84,7 +82,7 @@ export async function getWarehouses() {
     const res = await getSharedGetRequest(
       "GET:/warehouses",
       () => API.get("/warehouses"),
-      5000
+      5000,
     );
     return res.data;
   } catch (error) {
@@ -141,7 +139,10 @@ export async function deleteAdmin(id) {
     const res = await API.delete(`${API_BASE}/admin/delete/${id}`);
     return res.data;
   } catch (error) {
-    console.error("Error deleting admin:", error.response?.data || error.message);
+    console.error(
+      "Error deleting admin:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to delete admin",
@@ -154,7 +155,10 @@ export async function AdminList() {
     const res = await API.get(`${API_BASE}/admin/list`);
     return res.data;
   } catch (error) {
-    console.error("Error fetching admin list:", error.response?.data || error.message);
+    console.error(
+      "Error fetching admin list:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to fetch admin list",
@@ -163,7 +167,6 @@ export async function AdminList() {
 }
 
 // ================= RESTAURANT ==================
-
 
 // ================= RESTAURANTLIST =================
 
@@ -175,8 +178,7 @@ export async function restaurantprofile() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
@@ -190,8 +192,7 @@ export async function restaurantOnlyLogged() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
@@ -204,8 +205,7 @@ export async function getUserProfiles() {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to fetch user profiles",
+      message: error.response?.data?.message || "Failed to fetch user profiles",
     };
   }
 }
@@ -398,8 +398,7 @@ export async function createNotificationCampaign(payload) {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to send notification campaign",
+        error.response?.data?.message || "Failed to send notification campaign",
     };
   }
 }
@@ -456,8 +455,7 @@ export async function restaurantList() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
@@ -470,8 +468,7 @@ export async function restaurantRejected() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
@@ -486,29 +483,24 @@ export async function restaurantApproved() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
 
-
 // ================= RESTAURANT APPROVE =================
 export async function approveRestaurantReq(id) {
   try {
-    const res = await API.post(
-      `${API_BASE}/admin/restaurants/approve/${id}`
-    );
+    const res = await API.post(`${API_BASE}/admin/restaurants/approve/${id}`);
     return res.data;
   } catch (error) {
     console.error(
       `restaurants/approve/${id}`,
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to approve restaurant",
+      message: error.response?.data?.message || "Failed to approve restaurant",
     };
   }
 }
@@ -516,26 +508,21 @@ export async function approveRestaurantReq(id) {
 // ================= RESTAURANT REJECT =================
 export async function rejectRestaurantReq(id) {
   try {
-    const res = await API.post(
-      `${API_BASE}/admin/restaurants/reject/${id}`
-    );
+    const res = await API.post(`${API_BASE}/admin/restaurants/reject/${id}`);
     return res.data;
   } catch (error) {
     console.error(
       `restaurants/reject/${id}`,
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to reject restaurant",
+      message: error.response?.data?.message || "Failed to reject restaurant",
     };
   }
 }
 
-
 // ================= Drivers ==================
-
 
 // ================= Drivers Penddind LIST ==================
 
@@ -544,17 +531,13 @@ export async function DriversList() {
     const res = await API.get("/admin/dashboard/drivers/pending");
     // console.log(res.data);
     return res.data;
-  }
-  catch (error) {
+  } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message ||
-        "Failed to fetch Driver list",
+      message: error.response?.data?.message || "Failed to fetch Driver list",
     };
   }
 }
-
 
 // =================  rejected Driver LIST ==================
 export async function DriverRejected() {
@@ -567,8 +550,7 @@ export async function DriverRejected() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
@@ -582,27 +564,23 @@ export async function DriverApproved() {
     return {
       ok: false,
       message:
-        error.response?.data?.message ||
-        "Failed to fetch restaurant list",
+        error.response?.data?.message || "Failed to fetch restaurant list",
     };
   }
 }
 // ================= Driver APPROVE =================
 export async function approveDriverReq(id) {
   try {
-    const res = await API.post(
-      `${API_BASE}/admin/drivers/approve/${id}`
-    );
+    const res = await API.post(`${API_BASE}/admin/drivers/approve/${id}`);
     return res.data;
   } catch (error) {
     console.error(
       `drivers/approve/${id}`,
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to approve  dreivers",
+      message: error.response?.data?.message || "Failed to approve  dreivers",
     };
   }
 }
@@ -610,19 +588,16 @@ export async function approveDriverReq(id) {
 // ================= Driver REJECT =================
 export async function rejectDriverReq(id) {
   try {
-    const res = await API.post(
-      `${API_BASE}/admin/drivers/reject/${id}`
-    );
+    const res = await API.post(`${API_BASE}/admin/drivers/reject/${id}`);
     return res.data;
   } catch (error) {
     console.error(
       `drivers/reject/${id}`,
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to reject driver",
+      message: error.response?.data?.message || "Failed to reject driver",
     };
   }
 }
@@ -634,8 +609,7 @@ export async function blockDriverReq(id, payload) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to block driver",
+      message: error.response?.data?.message || "Failed to block driver",
     };
   }
 }
@@ -647,15 +621,16 @@ export async function unblockDriverReq(id, payload = {}) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to unblock driver",
+      message: error.response?.data?.message || "Failed to unblock driver",
     };
   }
 }
 
 export async function fetchDriverRestrictionHistory(driverId) {
   try {
-    const res = await API.get(`/admin/dashboard/drivers/${driverId}/restrictions`);
+    const res = await API.get(
+      `/admin/dashboard/drivers/${driverId}/restrictions`,
+    );
     return { ok: true, data: res.data };
   } catch (error) {
     return {
@@ -675,9 +650,7 @@ export async function DriverOrder(driverId) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message ||
-        "Failed to fetch driver orders",
+      message: error.response?.data?.message || "Failed to fetch driver orders",
     };
   }
 }
@@ -694,8 +667,7 @@ export async function fetchCategories() {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to fetch categories",
+      message: error.response?.data?.message || "Failed to fetch categories",
     };
   }
 }
@@ -711,8 +683,7 @@ export async function createCategory(formData) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to create category",
+      message: error.response?.data?.message || "Failed to create category",
     };
   }
 }
@@ -728,8 +699,7 @@ export async function updateCategory(id, formData) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to update category",
+      message: error.response?.data?.message || "Failed to update category",
     };
   }
 }
@@ -741,8 +711,67 @@ export async function deleteCategory(id) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to delete category",
+      message: error.response?.data?.message || "Failed to delete category",
+    };
+  }
+}
+
+/* ================= FETCH SUBCATEGORIES ================= */
+export async function fetchSubCategories() {
+  try {
+    const res = await API.get("/subcategories/all");
+    return {
+      ok: true,
+      subcategories: res.data.subCategories,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error.response?.data?.message || "Failed to fetch subcategories",
+    };
+  }
+}
+
+export async function createSubCategory(formData) {
+  try {
+    const res = await API.post("/subcategories/create", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error.response?.data?.message || "Failed to create subcategory",
+    };
+  }
+}
+
+export async function updateSubCategory(id, formData) {
+  try {
+    const res = await API.put(`/subcategories/update/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error.response?.data?.message || "Failed to update subcategory",
+    };
+  }
+}
+
+export async function deleteSubCategory(id) {
+  try {
+    const res = await API.delete(`/subcategories/delete/${id}`);
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return {
+      ok: false,
+      message: error.response?.data?.message || "Failed to delete subcategory",
     };
   }
 }
@@ -755,8 +784,7 @@ export async function createProduct(formData) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to create product",
+      message: error.response?.data?.message || "Failed to create product",
     };
   }
 }
@@ -793,8 +821,6 @@ export async function bulkUploadProductImages(formData) {
   }
 }
 
-
-
 /* ================= GET ALL ACTIVE PRODUCTS (PUBLIC) ================= */
 export async function getActiveProducts() {
   try {
@@ -803,8 +829,7 @@ export async function getActiveProducts() {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to fetch products",
+      message: error.response?.data?.message || "Failed to fetch products",
     };
   }
 }
@@ -817,8 +842,7 @@ export async function getProductById(id) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to fetch product",
+      message: error.response?.data?.message || "Failed to fetch product",
     };
   }
 }
@@ -831,8 +855,7 @@ export async function myProducts(params = {}) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to fetch my products",
+      message: error.response?.data?.message || "Failed to fetch my products",
     };
   }
 }
@@ -843,11 +866,13 @@ export async function updateProduct(id, formData) {
     const res = await API.put(`/products/update/${id}`, formData);
     return { ok: true, data: res.data };
   } catch (error) {
-    console.error("Update Product Error:", error.response?.data || error.message);
+    console.error(
+      "Update Product Error:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to update product",
+      message: error.response?.data?.message || "Failed to update product",
     };
   }
 }
@@ -858,11 +883,13 @@ export async function deleteProduct(id) {
     const res = await API.delete(`/products/delete/${id}`);
     return { ok: true, data: res.data };
   } catch (error) {
-    console.error("Delete Product Error:", error.response?.data || error.message);
+    console.error(
+      "Delete Product Error:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to delete product",
+      message: error.response?.data?.message || "Failed to delete product",
     };
   }
 }
@@ -906,15 +933,13 @@ export async function fetchDriverReviewsAdmin(driverId) {
   }
 }
 
-
 /* =================  ORDERS API ================= */
 
 /* ================= GET ADMIN ORDERS ================= */
 export async function getAdminOrders() {
   try {
-    const res = await getSharedGetRequest(
-      "GET:/orders/admin",
-      () => API.get("/orders/admin")
+    const res = await getSharedGetRequest("GET:/orders/admin", () =>
+      API.get("/orders/admin"),
     );
     return { ok: true, data: res.data };
   } catch (error) {
@@ -925,13 +950,11 @@ export async function getAdminOrders() {
   }
 }
 
-
 /* ================= GET ALL ORDERS (SUPERADMIN) ================= */
 export async function getAllOrders() {
   try {
-    const res = await getSharedGetRequest(
-      "GET:/orders/all",
-      () => API.get("/orders/all")
+    const res = await getSharedGetRequest("GET:/orders/all", () =>
+      API.get("/orders/all"),
     );
     return { ok: true, data: res.data };
   } catch (error) {
@@ -950,17 +973,17 @@ export async function getOrdersByUser(userId) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to fetch user orders",
+      message: error.response?.data?.message || "Failed to fetch user orders",
     };
   }
 }
 
-
 /* ================= UPDATE ORDER STATUS ================= */
 export async function updateOrderStatus(orderId, status) {
   try {
-    const res = await API.put(`/orders/status/${orderId}`, { orderStatus: status });
+    const res = await API.put(`/orders/status/${orderId}`, {
+      orderStatus: status,
+    });
     return { ok: true, data: res.data };
   } catch (error) {
     return {
@@ -1012,7 +1035,6 @@ export async function verifyPickupOtp(orderId, otp, paymentMode) {
   }
 }
 
-
 /* ================= GET SINGLE ORDER ================= */
 export async function getOrderById(orderId) {
   try {
@@ -1057,7 +1079,6 @@ export async function downloadOrderInvoice(orderId) {
   }
 }
 
-
 /* ================= GET ADMIN RETURN ORDERS ================= */
 export async function getReturnOrders() {
   try {
@@ -1068,7 +1089,7 @@ export async function getReturnOrders() {
   } catch (error) {
     console.error(
       "Error fetching return orders:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
 
     return {
@@ -1092,7 +1113,7 @@ export async function updateReturnStatus(returnId, status, adminRemark = "") {
   } catch (error) {
     console.error(
       "Update Return Status Error:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
 
     return {
@@ -1104,15 +1125,13 @@ export async function updateReturnStatus(returnId, status, adminRemark = "") {
   }
 }
 
-
-
 // ================= Banner ==================
 // ================= create Banner ==================
 export async function createBanner(formData) {
   try {
     const config = {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        "Content-Type": "multipart/form-data",
       },
     };
 
@@ -1142,13 +1161,10 @@ export async function BannersList() {
   try {
     const res = await API.get("/banners/all");
     return { ok: true, data: res.data };
-  }
-  catch (error) {
+  } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message ||
-        "Failed to fetch banners",
+      message: error.response?.data?.message || "Failed to fetch banners",
     };
   }
 }
@@ -1158,11 +1174,13 @@ export async function DeleteBanner(id) {
     const res = await API.delete(`/banners/delete/${id}`);
     return { ok: true, data: res.data };
   } catch (error) {
-    console.error("Delete Product Error:", error.response?.data || error.message);
+    console.error(
+      "Delete Product Error:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to delete product",
+      message: error.response?.data?.message || "Failed to delete product",
     };
   }
 }
@@ -1171,21 +1189,17 @@ export async function DeleteBanner(id) {
 
 export async function updateBanner(id, formData) {
   try {
-    const res = await API.put(
-      `/banners/update/${id}`,
-      formData,
-      {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      }
-    );
+    const res = await API.put(`/banners/update/${id}`, formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
 
     return { ok: true, data: res.data };
   } catch (error) {
     console.error(
       "Update Banner Error:",
-      error.response?.data || error.message
+      error.response?.data || error.message,
     );
 
     return {
@@ -1202,8 +1216,7 @@ export async function updateBanner(id, formData) {
   }
 }
 
-
-//  ////////// Wallet 
+//  ////////// Wallet
 // =================get  Wallet LIST ==================
 
 export async function WalletList() {
@@ -1211,17 +1224,13 @@ export async function WalletList() {
     const res = await API.get("/wallet/admin/all");
 
     return res.data;
-  }
-  catch (error) {
+  } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message ||
-        "Failed to fetch Wallet list",
+      message: error.response?.data?.message || "Failed to fetch Wallet list",
     };
   }
 }
-
 
 // ================= ADMIN WALLET CREDIT ==================
 export async function creditWallet(data) {
@@ -1229,11 +1238,13 @@ export async function creditWallet(data) {
     const res = await API.post("/wallet/admin/credit", data);
     return { ok: true, data: res.data };
   } catch (error) {
-    console.error("Credit Wallet Error:", error.response?.data || error.message);
+    console.error(
+      "Credit Wallet Error:",
+      error.response?.data || error.message,
+    );
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to credit wallet",
+      message: error.response?.data?.message || "Failed to credit wallet",
     };
   }
 }
@@ -1247,8 +1258,7 @@ export async function debitWallet(data) {
     console.error("Debit Wallet Error:", error.response?.data || error.message);
     return {
       ok: false,
-      message:
-        error.response?.data?.message || "Failed to debit wallet",
+      message: error.response?.data?.message || "Failed to debit wallet",
     };
   }
 }
@@ -1259,8 +1269,8 @@ export async function getUserTransactions(userId, page = 1, limit = 20) {
     const res = await API.get(`/wallet/admin/user/${userId}/transactions`, {
       params: {
         page,
-        limit
-      }
+        limit,
+      },
     });
     return { ok: true, data: res.data };
   } catch (error) {
@@ -1279,8 +1289,8 @@ export async function getUserTransactionsWithParams(userId, params = {}) {
       params: {
         page: params.page || 1,
         limit: params.limit || 20,
-        ...params
-      }
+        ...params,
+      },
     });
     return { ok: true, data: res.data };
   } catch (error) {
@@ -1301,8 +1311,7 @@ export async function getWalletOffers() {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to fetch wallet offers",
+      message: error.response?.data?.message || "Failed to fetch wallet offers",
     };
   }
 }
@@ -1315,8 +1324,7 @@ export async function createWalletOffer(data) {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to create wallet offer",
+      message: error.response?.data?.message || "Failed to create wallet offer",
     };
   }
 }
@@ -1329,8 +1337,7 @@ export async function updateWalletOffer(id, data) {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to update wallet offer",
+      message: error.response?.data?.message || "Failed to update wallet offer",
     };
   }
 }
@@ -1343,8 +1350,7 @@ export async function toggleWalletOffer(id) {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to toggle wallet offer",
+      message: error.response?.data?.message || "Failed to toggle wallet offer",
     };
   }
 }
@@ -1357,8 +1363,7 @@ export async function deleteWalletOffer(id) {
     return {
       ok: false,
       success: false,
-      message:
-        error.response?.data?.message || "Failed to delete wallet offer",
+      message: error.response?.data?.message || "Failed to delete wallet offer",
     };
   }
 }
