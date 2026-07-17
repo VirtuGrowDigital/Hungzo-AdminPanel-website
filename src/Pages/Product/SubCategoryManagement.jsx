@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { PencilIcon, PhotoIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 import {
+  fetchCategories,
   createSubCategory,
   deleteSubCategory,
   fetchSubCategories,
@@ -41,6 +42,14 @@ export default function SubCategoryManagement() {
     if (categoryRes.ok) setCategories(categoryRes.categories);
 
     if (subRes.ok) setsubCategories(subRes.subcategories);
+
+    if (!categoryRes.ok) {
+      toast.error(categoryRes.message);
+    }
+    
+    if (!subRes.ok) {
+      toast.error(subRes.message);
+    }
 
     setLoading(false);
   };
@@ -86,9 +95,18 @@ export default function SubCategoryManagement() {
     }
 
     const payload = new FormData();
+    if (!form.category) {
+      toast.error("Please select a category");
+      return;
+    }
+
+    payload.append("category", form.category);
     payload.append("name", form.name.trim());
     payload.append("isActive", String(form.isActive));
-    if (form.image) payload.append("image", form.image);
+
+    if (form.image) {
+      payload.append("image", form.image);
+    }
 
     setSubmitting(true);
     const res = isEditing
@@ -103,12 +121,13 @@ export default function SubCategoryManagement() {
 
     toast.success(isEditing ? "SubCategory updated" : "SubCategory created");
     resetForm();
-    await loadSubCategories();
+    await loadData();
   };
 
   const handleEdit = (subcategory) => {
     setEditingId(subcategory._id);
     setForm({
+      category: subcategory.category?._id ?? "",
       name: subcategory.name ?? "",
       image: null,
       isActive: subcategory.isActive !== false,
@@ -133,7 +152,7 @@ export default function SubCategoryManagement() {
 
     toast.success("SubCategory deleted");
     if (editingId === subcategory._id) resetForm();
-    await loadSubCategories();
+    await loadData();
   };
 
   return (
@@ -210,12 +229,21 @@ export default function SubCategoryManagement() {
                     type="file"
                     accept="image/png,image/jpeg,image/webp"
                     className="hidden"
-                    onChange={(event) =>
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+
+                      if (!file) return;
+
+                      if (file.size > 5 * 1024 * 1024) {
+                        toast.error("Image must be under 5MB");
+                        return;
+                      }
+
                       setForm((prev) => ({
                         ...prev,
-                        image: event.target.files?.[0] ?? null,
-                      }))
-                    }
+                        image: file,
+                      }));
+                    }}
                   />
                   <div className="space-y-2">
                     <PhotoIcon className="mx-auto h-8 w-8 text-slate-400" />
@@ -338,19 +366,23 @@ export default function SubCategoryManagement() {
                     <div className="space-y-2.5 p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="text-sm font-semibold text-slate-900">
+                          <p className="text-[11px] font-semibold uppercase tracking-wide text-emerald-600">
+                            {subcategory.category?.name || "No Category"}
+                          </p>
+
+                          <h3 className="mt-1 text-sm font-semibold text-slate-900">
                             {subcategory.name}
                           </h3>
+
                           <p className="mt-1 text-[11px] text-slate-500">
-                            {subcategory.productCount ?? 0} linked products
+                             {subcategory.productCount ?? 0} linked Products
                           </p>
                         </div>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
-                            subcategory.isActive === false
-                              ? "bg-amber-100 text-amber-700"
-                              : "bg-emerald-100 text-emerald-700"
-                          }`}
+                          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${subcategory.isActive === false
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                            }`}
                         >
                           {subcategory.isActive === false ? "Hidden" : "Live"}
                         </span>

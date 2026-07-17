@@ -17,6 +17,7 @@ import * as XLSX from "xlsx";
 
 import {
   fetchCategories,
+  fetchSubCategoriesByCategory,
   createProduct,
   bulkImportProducts,
 } from "../../Api";
@@ -35,6 +36,7 @@ const createEmptyVariety = () => ({
 const createInitialForm = () => ({
   name: "",
   category: "",
+  subCategory: "",
   status: "available",
   description: "",
   brand: "",
@@ -122,6 +124,7 @@ const bulkImportFieldDocs = [
   ["brand", "Yes", "Brand or manufacturer name", "Amul"],
   ["sku", "Yes", "Unique code, 3-40 chars using A-Z, 0-9, _ or -", "CHEESE-001"],
   ["category", "Yes", "Category name to match or auto-create", "DAIRY"],
+  ["subcategory", "Yes", "SubCategory name belonging to selected category", "MILK"],
   ["unit", "Yes", "Stored as kg, g, l, ml, pcs, packs, boxes, jars, bottles, cans", "KG"],
   ["packSizeLabel", "No", "Customer-facing pack label, can be left blank", "1 kg block"],
   ["minOrderQuantity", "Yes", "Minimum order quantity, at least 1", "2"],
@@ -177,6 +180,7 @@ const bulkTemplateRows = [
     upc: "8901234567890",
     hsnCode: "04061000",
     category: "DAIRY",
+    subcategory: "MILK",
     unit: "kg",
     packSizeLabel: "1 kg block",
     minOrderQuantity: 2,
@@ -277,12 +281,12 @@ const extractBulkVarieties = (row) => {
       discountedPrice: row[`variety${index}_discountedPrice`],
       isAvailable:
         row[`variety${index}_isAvailable`] === "" ||
-        row[`variety${index}_isAvailable`] === undefined ||
-        row[`variety${index}_isAvailable`] === null
+          row[`variety${index}_isAvailable`] === undefined ||
+          row[`variety${index}_isAvailable`] === null
           ? true
           : ["true", "1", "yes"].includes(
-              String(row[`variety${index}_isAvailable`]).trim().toLowerCase()
-            ),
+            String(row[`variety${index}_isAvailable`]).trim().toLowerCase()
+          ),
     }))
     .filter(
       (variety) =>
@@ -310,6 +314,7 @@ const normalizeBulkRow = (row) => {
     upc: row.upc?.toString().trim() ?? "",
     hsnCode: row.hsnCode?.toString().trim() ?? "",
     category: row.category?.toString().trim() ?? "",
+    subcategory: row.subcategory?.toString().trim() ?? "",
     unit: normalizeUnitValue(row.unit, "pcs"),
     packSizeLabel: row.packSizeLabel?.toString().trim() ?? "",
     minOrderQuantity: Number(row.minOrderQuantity || 1),
@@ -319,7 +324,7 @@ const normalizeBulkRow = (row) => {
     storageType: normalizeStorageTypeValue(row.storageType, "ambient"),
     status: row.status?.toString().trim() || "available",
     isActive:
-      row.isActive === ""
+      row.isActive === "" || row.isActive === undefined || row.isActive === null
         ? true
         : ["true", "1", "yes"].includes(String(row.isActive ?? "").trim().toLowerCase()),
     isFeatured: ["true", "1", "yes"].includes(
@@ -345,6 +350,7 @@ const normalizeBulkRow = (row) => {
 export default function AddProductPage() {
   const [mode, setMode] = useState("manual");
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [form, setForm] = useState(createInitialForm);
   const [varieties, setVarieties] = useState([createEmptyVariety()]);
   const [images, setImages] = useState([]);
@@ -373,6 +379,29 @@ export default function AddProductPage() {
   useEffect(() => {
     loadCategories();
   }, []);
+
+  const loadSubCategories = async (categoryId) => {
+    const res = await fetchSubCategoriesByCategory(categoryId);
+
+    if (res.ok) {
+      setSubCategories(res.subCategories);
+    } else {
+      setSubCategories([]);
+      toast.error(res.message);
+    }
+  };
+  useEffect(() => {
+    if (!form.category) {
+      setSubCategories([]);
+      setForm((prev) => ({
+        ...prev,
+        subCategory: "",
+      }));
+      return;
+    }
+
+    loadSubCategories(form.category);
+  }, [form.category]);
 
   useEffect(() => {
     return () => {
@@ -520,6 +549,8 @@ export default function AddProductPage() {
   const validateForm = () => {
     if (!form.name.trim()) return "Product name is required";
     if (!form.category) return "Category is required";
+    if (!form.subCategory)
+      return "SubCategory is required";
 
     const validVarieties = getValidVarieties();
     if (validVarieties.length === 0) {
@@ -596,6 +627,10 @@ export default function AddProductPage() {
       const formData = new FormData();
       formData.append("name", form.name.trim());
       formData.append("category", form.category);
+      formData.append(
+        "subcategory",
+        form.subCategory
+      );
       formData.append("status", form.status);
       formData.append("description", form.description.trim());
       formData.append("brand", form.brand.trim());
@@ -669,7 +704,7 @@ export default function AddProductPage() {
       ["4. Fix failed rows before importing"],
       [""],
       ["Required columns"],
-      ["name", "brand", "sku", "category", "unit"],
+      ["name", "brand", "sku", "category", "subcategory", "unit"],
       ["minOrderQuantity", "stockQuantity", "status"],
       ["Optional: packSizeLabel", "Optional: storageType"],
       ["variety1_name", "variety1_originalPrice", "variety1_discountedPrice"],
@@ -868,6 +903,41 @@ export default function AddProductPage() {
                 </select>
                 <Link
                   to="/product/categories"
+                  className="inline-flex items-center rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Manage
+                </Link>
+              </div>
+            </div>
+
+            <div>
+              <label className={sectionTitleClass}>SubCategory</label>
+
+              <div className="mt-1.5 flex gap-3">
+                <select
+                  name="subCategory"
+                  value={form.subCategory}
+                  onChange={handleChange}
+                  disabled={!form.category}
+                  className={inputClass}
+                >
+                  <option value="">
+                    {form.category
+                      ? "Select SubCategory"
+                      : "Select Category First"}
+                  </option>
+
+                  {subCategories
+                    .filter((sub) => sub.isActive !== false)
+                    .map((sub) => (
+                      <option key={sub._id} value={sub._id}>
+                        {sub.name}
+                      </option>
+                    ))}
+                </select>
+
+                <Link
+                  to="/product/subcategories"
                   className="inline-flex items-center rounded-xl border border-slate-200 px-3 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
                 >
                   Manage
@@ -1237,11 +1307,10 @@ export default function AddProductPage() {
                       <button
                         type="button"
                         onClick={() => setPrimaryImage(image.id)}
-                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                          primaryImageRef === image.id
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-slate-100 text-slate-600"
-                        }`}
+                        className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold ${primaryImageRef === image.id
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                          }`}
                       >
                         <Check size={12} />
                         {primaryImageRef === image.id ? "Primary" : "Set primary"}
@@ -1294,9 +1363,8 @@ export default function AddProductPage() {
           </button>
           {message && (
             <p
-              className={`mt-3 text-sm ${
-                message.type === "error" ? "text-rose-300" : "text-emerald-300"
-              }`}
+              className={`mt-3 text-sm ${message.type === "error" ? "text-rose-300" : "text-emerald-300"
+                }`}
             >
               {message.text}
             </p>
@@ -1408,7 +1476,7 @@ export default function AddProductPage() {
           <div>
             <div className="font-semibold">Required columns</div>
             <p className="mt-2 leading-6">
-              `name`, `brand`, `sku`, `category`, `unit`, `minOrderQuantity`,
+              `name`, `brand`, `sku`, `category`, `subcategory`, `unit`, `minOrderQuantity`,
               `stockQuantity`, `status`, plus at least one variety using `variety1_name`,
               `variety1_originalPrice`, and `variety1_discountedPrice`. Optional fields include
               `packSizeLabel` and `storageType`.
@@ -1521,11 +1589,10 @@ export default function AddProductPage() {
               {bulkPreview.rows?.map((row) => (
                 <div
                   key={`${row.rowNumber}-${row.sku}-${row.name}`}
-                  className={`rounded-2xl p-4 ring-1 ${
-                    row.errors?.length > 0
-                      ? "bg-rose-50 ring-rose-200"
-                      : "bg-emerald-50 ring-emerald-200"
-                  }`}
+                  className={`rounded-2xl p-4 ring-1 ${row.errors?.length > 0
+                    ? "bg-rose-50 ring-rose-200"
+                    : "bg-emerald-50 ring-emerald-200"
+                    }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1541,11 +1608,10 @@ export default function AddProductPage() {
                       </div>
                     </div>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                        row.errors?.length > 0
-                          ? "bg-rose-100 text-rose-700"
-                          : "bg-emerald-100 text-emerald-700"
-                      }`}
+                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${row.errors?.length > 0
+                        ? "bg-rose-100 text-rose-700"
+                        : "bg-emerald-100 text-emerald-700"
+                        }`}
                     >
                       {row.errors?.length > 0 ? "Needs fixes" : "Ready"}
                     </span>
@@ -1590,11 +1656,10 @@ export default function AddProductPage() {
               key={option.value}
               type="button"
               onClick={() => setMode(option.value)}
-              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
-                mode === option.value
-                  ? "bg-slate-900 text-white"
-                  : "text-slate-600 hover:bg-slate-50"
-              }`}
+              className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${mode === option.value
+                ? "bg-slate-900 text-white"
+                : "text-slate-600 hover:bg-slate-50"
+                }`}
             >
               {option.label}
             </button>

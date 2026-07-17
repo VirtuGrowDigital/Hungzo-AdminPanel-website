@@ -24,6 +24,7 @@ import {
   deleteProduct,
   fetchProductReviewsAdmin,
   updateProductReviewStatus,
+  fetchSubCategories,
 } from "../../Api";
 import { PUBLIC_PRODUCT_DEFAULT_IMAGE_URL } from "../../utils/publicAssets";
 import ProductSectionTabs from "./ProductSectionTabs";
@@ -44,10 +45,10 @@ const formatCurrency = (value) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue)
     ? new Intl.NumberFormat("en-IN", {
-        style: "currency",
-        currency: "INR",
-        maximumFractionDigits: 0,
-      }).format(numericValue)
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(numericValue)
     : "—";
 };
 const getProductCategoryId = (product = {}) =>
@@ -58,6 +59,16 @@ const getProductCategoryName = (product = {}, categoryNameById = {}) =>
   typeof product.category === "object"
     ? product.category?.name ?? "—"
     : categoryNameById[product.category] ?? "—";
+
+const getProductSubCategoryId = (product = {}) =>
+  typeof product.subcategory === "object"
+    ? product.subcategory?._id ?? ""
+    : product.subcategory?.toString() ?? "";
+
+const getSubCategoryParentId = (subCategory = {}) =>
+  typeof subCategory.category === "object"
+    ? subCategory.category?._id ?? ""
+    : subCategory.category?.toString() ?? "";
 const getProductsFromResponse = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.products)) return payload.products;
@@ -260,6 +271,7 @@ const getEditableImageCount = (product = {}, selectedImages = []) =>
 const normalizeProductForEdit = (product) => ({
   ...product,
   category: getProductCategoryId(product),
+  subcategory: getProductSubCategoryId(product),
   description: product.description ?? "",
   name: product.name ?? "",
   brand: product.brand ?? "",
@@ -303,8 +315,10 @@ const INVENTORY_PAGE_SIZE = 10;
 export default function ProductsList() {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
+  const [subCategoryFilter, setsubCategoryFilter] = useState("all");
   const [stockFilter, setStockFilter] = useState("all");
   const [merchandisingFilter, setMerchandisingFilter] = useState("all");
   const [sortBy, setSortBy] = useState("attention");
@@ -348,9 +362,14 @@ export default function ProductsList() {
   }, []);
 
   useEffect(() => {
+    loadSubCategories();
+  }, []);
+
+  useEffect(() => {
     const filterKey = JSON.stringify({
       search,
       categoryFilter,
+      subCategoryFilter,
       stockFilter,
       merchandisingFilter,
       sortBy,
@@ -368,7 +387,7 @@ export default function ProductsList() {
 
     previousFilterKeyRef.current = filterKey;
     loadProducts();
-  }, [currentPage, search, categoryFilter, stockFilter, merchandisingFilter, sortBy]);
+  }, [currentPage, search, categoryFilter, subCategoryFilter, stockFilter, merchandisingFilter, sortBy]);
 
   useEffect(() => {
     return () => {
@@ -387,6 +406,13 @@ export default function ProductsList() {
     }
   };
 
+  const loadSubCategories = async () => {
+    const res = await fetchSubCategories();
+    if (res?.ok) {
+      setSubCategories(res.subcategories || []);
+    }
+  };
+
   const loadProducts = async () => {
     setProductsLoading(true);
     setProductsError("");
@@ -395,6 +421,7 @@ export default function ProductsList() {
       limit: INVENTORY_PAGE_SIZE,
       search,
       categoryId: categoryFilter,
+      subcategoryId: subCategoryFilter,
       stockFilter,
       merchandisingFilter,
       sortBy,
@@ -454,6 +481,30 @@ export default function ProductsList() {
       }, {}),
     [categories]
   );
+
+  const filterSubCategories = useMemo(
+    () =>
+      categoryFilter === "all"
+        ? subCategories
+        : subCategories.filter(
+            (sub) => getSubCategoryParentId(sub) === categoryFilter
+          ),
+    [subCategories, categoryFilter]
+  );
+
+  const editSubCategories = useMemo(
+    () =>
+      editingProduct?.category
+        ? subCategories.filter(
+            (sub) => getSubCategoryParentId(sub) === editingProduct.category
+          )
+        : [],
+    [subCategories, editingProduct?.category]
+  );
+
+  useEffect(() => {
+    setsubCategoryFilter("all");
+  }, [categoryFilter]);
 
   const filteredProducts = products;
 
@@ -544,11 +595,22 @@ export default function ProductsList() {
     setReviewsLoading(false);
   };
 
+  // const handleChange = (e) => {
+  //   const { name, value, type, checked } = e.target;
+  //   setEditingProduct((prev) => ({
+  //     ...prev,
+  //     [name]: type === "checkbox" ? checked : value,
+  //   }));
+  // };
+
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingProduct((prev) => ({
       ...prev,
       [name]: type === "checkbox" ? checked : value,
+      ...(name === "category" && value !== prev.category
+        ? { subcategory: "" }
+        : {}),
     }));
   };
 
@@ -681,12 +743,12 @@ export default function ProductsList() {
       setEditingProduct((currentProduct) =>
         currentProduct
           ? {
-              ...currentProduct,
-              primaryImage:
-                currentProduct.primaryImage === imageId
-                  ? currentProduct.images[0] || nextImages[0]?.id || ""
-                  : currentProduct.primaryImage,
-            }
+            ...currentProduct,
+            primaryImage:
+              currentProduct.primaryImage === imageId
+                ? currentProduct.images[0] || nextImages[0]?.id || ""
+                : currentProduct.primaryImage,
+          }
           : currentProduct
       );
       return nextImages;
@@ -698,9 +760,9 @@ export default function ProductsList() {
     setEditingProduct((prev) =>
       prev
         ? {
-            ...prev,
-            images: moveItem(prev.images, index, index + direction),
-          }
+          ...prev,
+          images: moveItem(prev.images, index, index + direction),
+        }
         : prev
     );
   };
@@ -718,9 +780,9 @@ export default function ProductsList() {
     setEditingProduct((prev) =>
       prev
         ? {
-            ...prev,
-            primaryImage: imageReference,
-          }
+          ...prev,
+          primaryImage: imageReference,
+        }
         : prev
     );
   };
@@ -731,6 +793,9 @@ export default function ProductsList() {
     }
     if (!editingProduct.category) {
       return "Category is required";
+    }
+    if (!editingProduct.subcategory) {
+      return "SubCategory is required";
     }
 
     const validVarieties = getValidVarieties(editingProduct.varieties);
@@ -809,6 +874,7 @@ export default function ProductsList() {
       formData.append("upc", editingProduct.upc?.trim().toUpperCase() || "");
       formData.append("hsnCode", editingProduct.hsnCode?.trim() || "");
       formData.append("category", editingProduct.category);
+      formData.append("subcategory", editingProduct.subcategory);
       formData.append("unit", editingProduct.unit || "pcs");
       formData.append("packSizeLabel", editingProduct.packSizeLabel?.trim() || "");
       formData.append("status", editingProduct.status);
@@ -1070,6 +1136,19 @@ export default function ProductsList() {
             </select>
 
             <select
+              value={subCategoryFilter}
+              onChange={(e) => setsubCategoryFilter(e.target.value)}
+              className={inputClass}
+            >
+              <option value="all">All subcategories</option>
+              {filterSubCategories.map((subcategory) => (
+                <option key={subcategory._id} value={subcategory._id}>
+                  {subcategory.name}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={stockFilter}
               onChange={(e) => setStockFilter(e.target.value)}
               className={inputClass}
@@ -1265,7 +1344,7 @@ export default function ProductsList() {
                                     : "Price not set"}
                                 </div>
                                 {priceSummary.originalPrice !== null &&
-                                priceSummary.originalPrice >
+                                  priceSummary.originalPrice >
                                   (priceSummary.startingPrice ?? 0) ? (
                                   <div className="text-xs text-slate-400 line-through">
                                     {formatCurrency(priceSummary.originalPrice)}
@@ -1311,11 +1390,10 @@ export default function ProductsList() {
                               value={product.status}
                               disabled={statusLoading === product._id}
                               onChange={(e) => updateStatus(product._id, e.target.value)}
-                              className={`rounded-full px-3 py-1.5 text-sm font-semibold text-white ${
-                                product.status === "available"
+                              className={`rounded-full px-3 py-1.5 text-sm font-semibold text-white ${product.status === "available"
                                   ? "bg-emerald-600"
                                   : "bg-rose-600"
-                              }`}
+                                }`}
                             >
                               <option value="available">Available</option>
                               <option value="not available">Not available</option>
@@ -1368,11 +1446,10 @@ export default function ProductsList() {
                     key={pageNumber}
                     type="button"
                     onClick={() => setCurrentPage(pageNumber)}
-                    className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${
-                      pageNumber === pagination.page
+                    className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${pageNumber === pagination.page
                         ? "bg-slate-900 text-white"
                         : "border border-slate-200 text-slate-700 hover:bg-slate-50"
-                    }`}
+                      }`}
                   >
                     {pageNumber}
                   </button>
@@ -1614,6 +1691,31 @@ export default function ProductsList() {
                               {category.name}
                             </option>
                           ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">
+                          SubCategory
+                        </label>
+                        <select
+                          name="subcategory"
+                          value={editingProduct.subcategory || ""}
+                          onChange={handleChange}
+                          disabled={!editingProduct.category}
+                          className={inputClass}
+                        >
+                          <option value="">
+                            {editingProduct.category
+                              ? "Select subcategory"
+                              : "Select category first"}
+                          </option>
+                          {editSubCategories
+                            .filter((sub) => sub.isActive !== false)
+                            .map((sub) => (
+                              <option key={sub._id} value={sub._id}>
+                                {sub.name}
+                              </option>
+                            ))}
                         </select>
                       </div>
                       <div>
@@ -1941,11 +2043,10 @@ export default function ProductsList() {
                                   {review.reviewerNameRaw || review.reviewerName || "Verified buyer"}
                                 </span>
                                 <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
-                                    review.status === "published"
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${review.status === "published"
                                       ? "bg-emerald-100 text-emerald-700"
                                       : "bg-slate-200 text-slate-700"
-                                  }`}
+                                    }`}
                                 >
                                   {review.status === "published" ? "Published" : "Hidden"}
                                 </span>
@@ -1968,11 +2069,10 @@ export default function ProductsList() {
                                   review.status === "published" ? "hidden" : "published"
                                 )
                               }
-                              className={`rounded-xl px-3 py-2 text-sm font-semibold ${
-                                review.status === "published"
+                              className={`rounded-xl px-3 py-2 text-sm font-semibold ${review.status === "published"
                                   ? "bg-slate-900 text-white"
                                   : "bg-emerald-600 text-white"
-                              } disabled:cursor-not-allowed disabled:opacity-60`}
+                                } disabled:cursor-not-allowed disabled:opacity-60`}
                             >
                               {reviewStatusLoading === review._id
                                 ? "Updating..."
@@ -2071,11 +2171,10 @@ export default function ProductsList() {
                                       <button
                                         type="button"
                                         onClick={() => setPrimaryImage(image)}
-                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                                          editingProduct.primaryImage === image
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image
                                             ? "bg-emerald-100 text-emerald-700"
                                             : "bg-slate-100 text-slate-600"
-                                        }`}
+                                          }`}
                                       >
                                         {editingProduct.primaryImage === image
                                           ? "Primary"
@@ -2143,11 +2242,10 @@ export default function ProductsList() {
                                       <button
                                         type="button"
                                         onClick={() => setPrimaryImage(image.id)}
-                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
-                                          editingProduct.primaryImage === image.id
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image.id
                                             ? "bg-emerald-100 text-emerald-700"
                                             : "bg-slate-100 text-slate-600"
-                                        }`}
+                                          }`}
                                       >
                                         {editingProduct.primaryImage === image.id
                                           ? "Primary"

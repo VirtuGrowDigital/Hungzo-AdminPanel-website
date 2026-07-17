@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // const API_BASE = "https://api.hungzo.in";
-const API_BASE = "http://192.168.1.57:4000";
+const API_BASE = "http://192.168.1.36:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
 
 const API = axios.create({
@@ -772,6 +772,24 @@ export async function deleteSubCategory(id) {
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to delete subcategory",
+    };
+  }
+}
+
+export async function fetchSubCategoriesByCategory(categoryId) {
+  try {
+    const res = await API.get(`/subcategories/category/${categoryId}`);
+
+    return {
+      ok: true,
+      subCategories: res.data.subCategories,
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      message:
+        error.response?.data?.message ||
+        "Failed to fetch subcategories",
     };
   }
 }

@@ -5,6 +5,7 @@ const tabs = [
   { to: "/product/inventory", label: "Inventory" },
   { to: "/product/add", label: "Add Products" },
   { to: "/product/categories", label: "Category Management" },
+  { to: "/product/subcategories", label: "SubCategory Management" },
 ];
 
 export default function ProductSectionTabs() {
