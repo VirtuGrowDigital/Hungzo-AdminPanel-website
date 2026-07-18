@@ -25,6 +25,7 @@ import {
   fetchProductReviewsAdmin,
   updateProductReviewStatus,
   fetchSubCategories,
+  exportProducts
 } from "../../Api";
 import { PUBLIC_PRODUCT_DEFAULT_IMAGE_URL } from "../../utils/publicAssets";
 import ProductSectionTabs from "./ProductSectionTabs";
@@ -355,6 +356,7 @@ export default function ProductsList() {
   const [productReviews, setProductReviews] = useState([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [reviewStatusLoading, setReviewStatusLoading] = useState(null);
+  const [exportLoading, setExportLoading] = useState(false);
   const previousFilterKeyRef = useRef("");
 
   useEffect(() => {
@@ -487,8 +489,8 @@ export default function ProductsList() {
       categoryFilter === "all"
         ? subCategories
         : subCategories.filter(
-            (sub) => getSubCategoryParentId(sub) === categoryFilter
-          ),
+          (sub) => getSubCategoryParentId(sub) === categoryFilter
+        ),
     [subCategories, categoryFilter]
   );
 
@@ -496,8 +498,8 @@ export default function ProductsList() {
     () =>
       editingProduct?.category
         ? subCategories.filter(
-            (sub) => getSubCategoryParentId(sub) === editingProduct.category
-          )
+          (sub) => getSubCategoryParentId(sub) === editingProduct.category
+        )
         : [],
     [subCategories, editingProduct?.category]
   );
@@ -612,6 +614,56 @@ export default function ProductsList() {
         ? { subcategory: "" }
         : {}),
     }));
+  };
+
+  const handleExportProducts = async () => {
+    setExportLoading(true);
+
+    try {
+      const params = {
+        search,
+        categoryId: categoryFilter,
+        subcategoryId: subCategoryFilter,
+        stockFilter,
+        merchandisingFilter,
+        sortBy,
+      };
+
+      const result = await exportProducts(params);
+
+      if (!result.ok) {
+        toast.error(result.message);
+        return;
+      }
+
+      const blobUrl =
+        window.URL.createObjectURL(result.blob);
+
+      const a = document.createElement("a");
+
+      a.href = blobUrl;
+
+      const match =
+        /filename="([^"]+)"/i.exec(
+          result.contentDisposition
+        );
+
+      a.download =
+        match?.[1] ||
+        `products-export-${new Date()
+          .toISOString()
+          .slice(0, 10)}.csv`;
+
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      window.URL.revokeObjectURL(blobUrl);
+
+      toast.success("Products exported");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const handleVarietyChange = (index, field, value) => {
@@ -1046,6 +1098,14 @@ export default function ProductsList() {
                 <ArrowPathIcon className="h-4 w-4" />
                 Refresh inventory
               </button>
+              <button
+                type="button"
+                onClick={handleExportProducts}
+                disabled={exportLoading}
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white hover:bg-white/15 disabled:opacity-50"
+              >
+                {exportLoading ? "Exporting..." : "Export CSV"}
+              </button>
               <Link
                 to="/product/add"
                 className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-100"
@@ -1391,8 +1451,8 @@ export default function ProductsList() {
                               disabled={statusLoading === product._id}
                               onChange={(e) => updateStatus(product._id, e.target.value)}
                               className={`rounded-full px-3 py-1.5 text-sm font-semibold text-white ${product.status === "available"
-                                  ? "bg-emerald-600"
-                                  : "bg-rose-600"
+                                ? "bg-emerald-600"
+                                : "bg-rose-600"
                                 }`}
                             >
                               <option value="available">Available</option>
@@ -1447,8 +1507,8 @@ export default function ProductsList() {
                     type="button"
                     onClick={() => setCurrentPage(pageNumber)}
                     className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${pageNumber === pagination.page
-                        ? "bg-slate-900 text-white"
-                        : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                      ? "bg-slate-900 text-white"
+                      : "border border-slate-200 text-slate-700 hover:bg-slate-50"
                       }`}
                   >
                     {pageNumber}
@@ -2044,8 +2104,8 @@ export default function ProductsList() {
                                 </span>
                                 <span
                                   className={`rounded-full px-2.5 py-1 text-xs font-semibold ${review.status === "published"
-                                      ? "bg-emerald-100 text-emerald-700"
-                                      : "bg-slate-200 text-slate-700"
+                                    ? "bg-emerald-100 text-emerald-700"
+                                    : "bg-slate-200 text-slate-700"
                                     }`}
                                 >
                                   {review.status === "published" ? "Published" : "Hidden"}
@@ -2070,8 +2130,8 @@ export default function ProductsList() {
                                 )
                               }
                               className={`rounded-xl px-3 py-2 text-sm font-semibold ${review.status === "published"
-                                  ? "bg-slate-900 text-white"
-                                  : "bg-emerald-600 text-white"
+                                ? "bg-slate-900 text-white"
+                                : "bg-emerald-600 text-white"
                                 } disabled:cursor-not-allowed disabled:opacity-60`}
                             >
                               {reviewStatusLoading === review._id
@@ -2172,8 +2232,8 @@ export default function ProductsList() {
                                         type="button"
                                         onClick={() => setPrimaryImage(image)}
                                         className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : "bg-slate-100 text-slate-600"
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-slate-100 text-slate-600"
                                           }`}
                                       >
                                         {editingProduct.primaryImage === image
@@ -2243,8 +2303,8 @@ export default function ProductsList() {
                                         type="button"
                                         onClick={() => setPrimaryImage(image.id)}
                                         className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image.id
-                                            ? "bg-emerald-100 text-emerald-700"
-                                            : "bg-slate-100 text-slate-600"
+                                          ? "bg-emerald-100 text-emerald-700"
+                                          : "bg-slate-100 text-slate-600"
                                           }`}
                                       >
                                         {editingProduct.primaryImage === image.id

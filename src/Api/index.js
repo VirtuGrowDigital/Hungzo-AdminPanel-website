@@ -1,7 +1,7 @@
 import axios from "axios";
 
 // const API_BASE = "https://api.hungzo.in";
-const API_BASE = "http://192.168.1.36:4000";
+const API_BASE = "http://192.168.1.33:4000";
 // const API_BASE = "https://hungzo-backend.onrender.com";
 
 const API = axios.create({
@@ -908,6 +908,42 @@ export async function deleteProduct(id) {
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to delete product",
+    };
+  }
+}
+
+
+// Export Products --->
+export async function exportProducts(params = {}) {
+  try {
+    const res = await API.get("/products/inventory/export", {
+      params,
+      responseType: "blob",
+    });
+
+    return {
+      ok: true,
+      blob: res.data,
+      contentDisposition:
+        res.headers["content-disposition"] || "",
+    };
+  } catch (error) {
+    let message = "Failed to export products";
+
+    if (error.response?.data instanceof Blob) {
+      try {
+        const text = await error.response.data.text();
+        const parsed = JSON.parse(text);
+        message = parsed?.message || message;
+      } catch {}
+    } else {
+      message =
+        error.response?.data?.message || message;
+    }
+
+    return {
+      ok: false,
+      message,
     };
   }
 }
