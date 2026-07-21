@@ -597,13 +597,6 @@ export default function ProductsList() {
     setReviewsLoading(false);
   };
 
-  // const handleChange = (e) => {
-  //   const { name, value, type, checked } = e.target;
-  //   setEditingProduct((prev) => ({
-  //     ...prev,
-  //     [name]: type === "checkbox" ? checked : value,
-  //   }));
-  // };
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
