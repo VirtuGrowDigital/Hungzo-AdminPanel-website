@@ -1,8 +1,7 @@
 import axios from "axios";
 
-const API_BASE = "https://api.hungzo.in";
-// const API_BASE = "http://192.168.1.33:4000";
-
+// const API_BASE = "https://api.hungzo.in";
+const API_BASE = "http://10.32.147.13:4000";
 
 const API = axios.create({
   baseURL: API_BASE,
@@ -787,9 +786,7 @@ export async function fetchSubCategoriesByCategory(categoryId) {
   } catch (error) {
     return {
       ok: false,
-      message:
-        error.response?.data?.message ||
-        "Failed to fetch subcategories",
+      message: error.response?.data?.message || "Failed to fetch subcategories",
     };
   }
 }
@@ -912,7 +909,6 @@ export async function deleteProduct(id) {
   }
 }
 
-
 // Export Products --->
 export async function exportProducts(params = {}) {
   try {
@@ -924,8 +920,7 @@ export async function exportProducts(params = {}) {
     return {
       ok: true,
       blob: res.data,
-      contentDisposition:
-        res.headers["content-disposition"] || "",
+      contentDisposition: res.headers["content-disposition"] || "",
     };
   } catch (error) {
     let message = "Failed to export products";
@@ -937,8 +932,7 @@ export async function exportProducts(params = {}) {
         message = parsed?.message || message;
       } catch {}
     } else {
-      message =
-        error.response?.data?.message || message;
+      message = error.response?.data?.message || message;
     }
 
     return {
@@ -1072,11 +1066,31 @@ export async function assignWarehouseToOrder(orderId, warehouseId) {
   }
 }
 
-export async function verifyPickupOtp(orderId, otp, paymentMode) {
+// export async function verifyPickupOtp(orderId, otp, paymentMode) {
+//   try {
+//     const payload = { otp };
+//     if (paymentMode) {
+//       payload.paymentMode = paymentMode;
+//     }
+
+//     const res = await API.post(`/orders/pickup-verify/${orderId}`, payload);
+//     return { ok: true, data: res.data };
+//   } catch (error) {
+//     return {
+//       ok: false,
+//       message: error.response?.data?.message || "Failed to verify pickup OTP",
+//     };
+//   }
+// }
+export async function verifyPickupOtp(orderId, otp, paymentMode, options = {}) {
   try {
-    const payload = { otp };
-    if (paymentMode) {
-      payload.paymentMode = paymentMode;
+    const payload = {};
+    if (otp) payload.otp = otp;
+    if (paymentMode) payload.paymentMode = paymentMode;
+    if (options.bypassOtp) {
+      payload.bypassOtp = true;
+      payload.bypassReason =
+        options.bypassReason || "Customer did not receive OTP";
     }
 
     const res = await API.post(`/orders/pickup-verify/${orderId}`, payload);

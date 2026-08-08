@@ -45,23 +45,28 @@ const DELIVERY_ORDER_STATUS_OPTIONS = [
   "Cancelled",
 ];
 
-const SELF_PICKUP_ORDER_STATUS_OPTIONS = [
-  "Pending",
-  "Accepted",
-  "Packed",
+const SELF_PICKUP_ORDER_STATUS_OPTIONS = ["Pending", "Accepted", "Packed"];
+
+const SELF_PICKUP_SUPERADMIN_STATUS_OPTIONS = [
+  ...SELF_PICKUP_ORDER_STATUS_OPTIONS,
+  "Picked by Customer",
 ];
 
-const getOrderStatusOptions = (order) =>
-  order.fulfillmentType === "SELF_PICKUP"
-    ? SELF_PICKUP_ORDER_STATUS_OPTIONS
-    : DELIVERY_ORDER_STATUS_OPTIONS;
+const getOrderStatusOptions = (order, role) => {
+  if (order.fulfillmentType !== "SELF_PICKUP") {
+    return DELIVERY_ORDER_STATUS_OPTIONS;
+  }
+  return role === "SUPERADMIN"
+    ? SELF_PICKUP_SUPERADMIN_STATUS_OPTIONS
+    : SELF_PICKUP_ORDER_STATUS_OPTIONS;
+};
 
 /* ================= 🔔 NOTIFICATION SOUND ================= */
 const playNewOrderSound = () => {
   const audio = new Audio("/Alert.wav");
   audio.volume = 1;
   audio.currentTime = 0;
-  audio.play().catch(() => { });
+  audio.play().catch(() => {});
 };
 
 /* ================= 🪟 NEW ORDER POPUP ================= */
@@ -128,10 +133,7 @@ const LiveOrderTable = () => {
     try {
       let res;
 
-      if (
-        userRole === "SUPERADMIN" ||
-        userRole === "SUBADMIN"
-      ) {
+      if (userRole === "SUPERADMIN" || userRole === "SUBADMIN") {
         res = await getAllOrders();
       } else if (userRole === "ADMIN") {
         res = await getAdminOrders();
@@ -206,7 +208,7 @@ const LiveOrderTable = () => {
       }
 
       const options = (res?.warehouses || res?.data?.warehouses || []).filter(
-        (warehouse) => warehouse.status === "open"
+        (warehouse) => warehouse.status === "open",
       );
       setWarehouses(options);
     };
@@ -216,13 +218,13 @@ const LiveOrderTable = () => {
 
   /* ================= UPDATE STATUS ================= */
   const updateStatus = async (orderId, newStatus) => {
-    const order = orders.find(o => o._id === orderId);
+    const order = orders.find((o) => o._id === orderId);
     if (!order) {
       toast.error("Order not found");
       return;
     }
 
-    if (!getOrderStatusOptions(order).includes(newStatus)) {
+    if (!getOrderStatusOptions(order, userRole).includes(newStatus)) {
       toast.error(`Invalid status: ${newStatus}`);
       return;
     }
@@ -232,12 +234,23 @@ const LiveOrderTable = () => {
       return;
     }
 
+    if (
+      order.fulfillmentType === "SELF_PICKUP" &&
+      newStatus === "Picked by Customer" &&
+      !order.pickupOtpVerifiedAt
+    ) {
+      const confirmed = window.confirm(
+        "Mark this pickup as collected without OTP verification?",
+      );
+      if (!confirmed) return;
+    }
+
     const previous = orders;
 
     setOrders((prev) =>
       prev.map((o) =>
-        o._id === orderId ? { ...o, orderStatus: newStatus } : o
-      )
+        o._id === orderId ? { ...o, orderStatus: newStatus } : o,
+      ),
     );
 
     const res = await updateOrderStatusAPI(orderId, newStatus);
@@ -297,10 +310,10 @@ const LiveOrderTable = () => {
 
       const updatedOrder = res.data?.order;
       setOrders((prev) =>
-        prev.map((order) => (order._id === orderId ? updatedOrder : order))
+        prev.map((order) => (order._id === orderId ? updatedOrder : order)),
       );
       setSelectedOrder((current) =>
-        current?._id === orderId ? updatedOrder : current
+        current?._id === orderId ? updatedOrder : current,
       );
       toast.success("Warehouse assigned successfully");
     } finally {
@@ -308,12 +321,25 @@ const LiveOrderTable = () => {
     }
   };
 
-  const verifyPickupOtp = async (order) => {
+  const verifyPickupOtp = async (order, { bypass = false } = {}) => {
     const orderId = order._id;
     const otp = (pickupOtpDrafts[orderId] || "").trim();
-    if (!otp) {
+
+    if (!bypass && !otp) {
       toast.error("Enter the pickup OTP first");
       return;
+    }
+
+    let bypassReason = "";
+    if (bypass) {
+      bypassReason = window.prompt(
+        "Reason for completing this pickup without OTP:",
+        "Customer did not receive OTP",
+      );
+      if (!bypassReason || bypassReason.trim().length < 3) {
+        toast.error("A reason is required to skip OTP verification");
+        return;
+      }
     }
 
     const requiresPaymentCollection =
@@ -324,8 +350,12 @@ const LiveOrderTable = () => {
 
     try {
       setVerifyingPickupOrderId(orderId);
-      const res = await verifyPickupOtpAPI(orderId, otp, paymentMode);
-
+      const res = await verifyPickupOtpAPI(
+        orderId,
+        bypass ? "" : otp,
+        paymentMode,
+        bypass ? { bypassOtp: true, bypassReason: bypassReason.trim() } : {},
+      );
       if (!res.ok) {
         toast.error(res.message || "Failed to verify pickup OTP");
         return;
@@ -333,10 +363,10 @@ const LiveOrderTable = () => {
 
       const updatedOrder = res.data?.order;
       setOrders((prev) =>
-        prev.map((order) => (order._id === orderId ? updatedOrder : order))
+        prev.map((order) => (order._id === orderId ? updatedOrder : order)),
       );
       setSelectedOrder((current) =>
-        current?._id === orderId ? updatedOrder : current
+        current?._id === orderId ? updatedOrder : current,
       );
       setPickupOtpDrafts((prev) => ({
         ...prev,
@@ -384,14 +414,12 @@ const LiveOrderTable = () => {
     (order) =>
       order.orderStatus !== "Picked by Customer" &&
       order.orderStatus !== "Delivered" &&
-      order.orderStatus !== "Cancelled"
+      order.orderStatus !== "Cancelled",
   );
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-500">
-        Loading orders...
-      </div>
+      <div className="p-6 text-center text-gray-500">Loading orders...</div>
     );
   }
 
@@ -432,7 +460,10 @@ const LiveOrderTable = () => {
               {visibleOrders.map((order) => {
                 const selectedStatus =
                   statusDrafts[order._id] ?? order.orderStatus;
-                const availableStatusOptions = getOrderStatusOptions(order);
+                const availableStatusOptions = getOrderStatusOptions(
+                  order,
+                  userRole,
+                );
                 const disableUpdate = selectedStatus === order.orderStatus;
                 const showPickupVerification =
                   order.fulfillmentType === "SELF_PICKUP" &&
@@ -455,8 +486,7 @@ const LiveOrderTable = () => {
                       {order._id.substring(0, 8)}...
                     </td>
                     <td className="p-3">
-                      {order.userDetails?.phone ||
-                        order.userDetails?.email}
+                      {order.userDetails?.phone || order.userDetails?.email}
                     </td>
                     <td className="p-3 font-semibold text-center">
                       ₹{getAdminOrderTotal(order)}
@@ -499,8 +529,8 @@ const LiveOrderTable = () => {
                             {assigningWarehouseId === order._id
                               ? "Assigning..."
                               : order.warehouseAssignment
-                              ? "Reassign"
-                              : "Assign"}
+                                ? "Reassign"
+                                : "Assign"}
                           </button>
                           <div className="text-[11px] text-gray-500">
                             {order.warehouseAssignment?.name || "Not assigned"}
@@ -559,6 +589,23 @@ const LiveOrderTable = () => {
                                   ? "Verifying..."
                                   : "Verify OTP"}
                               </button>
+                              {userRole === "SUPERADMIN" ? (
+                                <button
+                                  onClick={() =>
+                                    verifyPickupOtp(order, { bypass: true })
+                                  }
+                                  disabled={
+                                    verifyingPickupOrderId === order._id
+                                  }
+                                  className={`block w-full rounded py-1 text-xs text-white ${
+                                    verifyingPickupOrderId === order._id
+                                      ? "cursor-not-allowed bg-gray-300"
+                                      : "bg-rose-600 hover:bg-rose-700"
+                                  }`}
+                                >
+                                  Complete without OTP
+                                </button>
+                              ) : null}
                             </div>
                           ) : null}
                         </div>
@@ -623,24 +670,14 @@ const LiveOrderTable = () => {
         />
       )}
 
-      <NewOrderPopup
-        order={popupOrder}
-        onClose={() => setPopupOrder(null)}
-      />
+      <NewOrderPopup order={popupOrder} onClose={() => setPopupOrder(null)} />
     </>
   );
 };
 
 /* ================= MODAL ================= */
-const OrderDetailsModal = ({
-  order,
-  onClose,
-  onPrintInvoice,
-}) => (
-  <div
-    className="fixed inset-0 z-50 bg-black/70 p-3 sm:p-4"
-    onClick={onClose}
-  >
+const OrderDetailsModal = ({ order, onClose, onPrintInvoice }) => (
+  <div className="fixed inset-0 z-50 bg-black/70 p-3 sm:p-4" onClick={onClose}>
     <div
       className="mx-auto flex h-full max-h-[calc(100vh-24px)] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:max-h-[calc(100vh-32px)]"
       onClick={(e) => e.stopPropagation()}
@@ -677,11 +714,11 @@ const OrderDetailsModal = ({
         <div className="grid grid-cols-1 gap-4 border-b p-4 text-sm sm:grid-cols-2 sm:p-5">
           <div className="space-y-2 rounded-xl bg-slate-50 p-4">
             <p className="break-words">
-            <strong>Status:</strong> {order.orderStatus}
+              <strong>Status:</strong> {order.orderStatus}
             </p>
             <p className="break-words">
-            <strong>Payment:</strong> {order.paymentMethod} (
-            {order.paymentStatus})
+              <strong>Payment:</strong> {order.paymentMethod} (
+              {order.paymentStatus})
             </p>
             {order.fulfillmentType === "SELF_PICKUP" &&
             order.pickupPaymentMethod &&
@@ -698,22 +735,22 @@ const OrderDetailsModal = ({
 
           <div className="space-y-2 rounded-xl bg-slate-50 p-4">
             <p className="break-words">
-            <strong>Customer:</strong>{" "}
-            {order.userDetails?.name ||
-              order.user?.restaurantId?.ownerName ||
-              order.user?.name ||
-              "******"}
+              <strong>Customer:</strong>{" "}
+              {order.userDetails?.name ||
+                order.user?.restaurantId?.ownerName ||
+                order.user?.name ||
+                "******"}
             </p>
             <p className="break-words">
               <strong>Restaurant Name:</strong>{" "}
               {order.user?.restaurantId?.name || "N/A"}
             </p>
             <p className="break-words">
-            <strong>Customer Num.:</strong>{" "}
-            {order.userDetails?.phone || "N/A"}
+              <strong>Customer Num.:</strong>{" "}
+              {order.userDetails?.phone || "N/A"}
             </p>
             <p className="break-words">
-            <strong>Address:</strong> {order.shippingAddress}
+              <strong>Address:</strong> {order.shippingAddress}
             </p>
             {order.fulfillmentType === "SELF_PICKUP" ? (
               <p className="break-words">
@@ -731,7 +768,8 @@ const OrderDetailsModal = ({
           </div>
         </div>
 
-        {order.fulfillmentType === "SELF_PICKUP" && order.warehouseAssignment ? (
+        {order.fulfillmentType === "SELF_PICKUP" &&
+        order.warehouseAssignment ? (
           <div className="border-b p-4 sm:p-5">
             <h3 className="mb-3 font-semibold">Self Pickup Warehouse</h3>
             <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
@@ -739,12 +777,15 @@ const OrderDetailsModal = ({
                 <strong>Name:</strong> {order.warehouseAssignment.name}
               </p>
               <p className="break-words">
-                <strong>Address:</strong> {order.warehouseAssignment.fullAddress}
+                <strong>Address:</strong>{" "}
+                {order.warehouseAssignment.fullAddress}
               </p>
               {order.pickupOtpGeneratedAt ? (
                 <p className="break-words">
                   <strong>Pickup OTP:</strong>{" "}
-                  {order.pickupOtpVerifiedAt ? "Verified" : "Pending verification"}
+                  {order.pickupOtpVerifiedAt
+                    ? "Verified"
+                    : "Pending verification"}
                 </p>
               ) : null}
               {order.warehouseAssignment.mapLink ? (
@@ -930,7 +971,7 @@ export default LiveOrderTable;
 //         // Check if it has numeric keys
 //         const keys = Object.keys(res.data);
 //         const hasNumericKeys = keys.some(key => !isNaN(key) && key !== "__v");
-        
+
 //         if (hasNumericKeys) {
 //           // Convert object with numeric keys to array
 //           fetchedOrders = Object.values(res.data).filter(item =>
@@ -943,7 +984,6 @@ export default LiveOrderTable;
 //           );
 //         }
 //       }
-
 
 //       if (fetchedOrders.length > 0) {
 //         // Log statuses for debugging
@@ -1006,7 +1046,6 @@ export default LiveOrderTable;
 
 //     // Call API
 //     const res = await updateOrderStatusAPI(orderId, newStatus);
-    
 
 //     if (!res.ok) {
 //       toast.error(res.message || "Failed to update");
@@ -1015,7 +1054,7 @@ export default LiveOrderTable;
 //     }
 
 //     toast.success(`Status updated to ${newStatus}`);
-    
+
 //     // Optionally refresh orders
 //     setTimeout(() => {
 //       loadOrders();
@@ -1034,12 +1073,12 @@ export default LiveOrderTable;
 //   /* ================= STATUS BADGE ================= */
 //   const badge = (status) => {
 //     const base = "px-2 py-1 rounded-full text-xs font-semibold";
-    
+
 //     // Normalize status string
 //     const normalizedStatus = status?.trim() || "Pending";
-    
+
 //     console.log("Badge for status:", status, "Normalized:", normalizedStatus);
-    
+
 //     switch (normalizedStatus) {
 //       case "Pending":
 //         return `${base} bg-yellow-100 text-yellow-800`;
@@ -1119,10 +1158,10 @@ export default LiveOrderTable;
 //               )}
 
 //               {visibleOrders.map((order) => {
-             
+
 //                 const normalizedStatus = order.orderStatus?.trim();
 //                 const isOutForDelivery = normalizedStatus === "Out for Delivery" || normalizedStatus === "Out for delivery";
-                
+
 //                 const canUpdate = !isOutForDelivery;
 
 //                 const canCancel =
