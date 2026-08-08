@@ -1,7 +1,7 @@
 import axios from "axios";
 
-// const API_BASE = "https://api.hungzo.in";
-const API_BASE = "http://10.32.147.13:4000";
+const API_BASE = "https://api.hungzo.in";
+// const API_BASE = "http://10.32.147.13:4000";
 
 const API = axios.create({
   baseURL: API_BASE,
