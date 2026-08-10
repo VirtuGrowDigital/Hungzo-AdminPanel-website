@@ -62,7 +62,7 @@ API.interceptors.request.use((config) => {
 
 export default API;
 
-// ================= create ADMINS ================
+// ================= create ADMINS ===============
 export async function createAdmin(formData) {
   try {
     const res = await API.post("/admin/create", formData);
