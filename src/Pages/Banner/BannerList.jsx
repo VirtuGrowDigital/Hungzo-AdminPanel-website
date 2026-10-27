@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { BannersList, DeleteBanner, updateBanner } from '../../Api';
+import LocationTargetingPicker from '../../Components/LocationTargetingPicker';
+import { emptyTargeting, isGlobalTargeting, normalizeTargeting } from '../../Api/multicity';
+import { useAuth } from '../../Context/AuthProvider';
 import { fetchCategories, myProducts } from '../../Api';
 import { toast } from 'react-hot-toast';
 import { X, Upload, Image as ImageIcon, Trash2, Check, Eye, AlertCircle } from 'lucide-react';
@@ -34,6 +37,8 @@ const BannerList = () => {
   const [imagePreviews, setImagePreviews] = useState([]);
   const [existingImages, setExistingImages] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [editTargeting, setEditTargeting] = useState(emptyTargeting());
+  const { user } = useAuth();
   const [showImagePreview, setShowImagePreview] = useState(false);
   const [previewImageIndex, setPreviewImageIndex] = useState(0);
 
@@ -113,6 +118,9 @@ const BannerList = () => {
       endsAt: banner.endsAt ? new Date(banner.endsAt).toISOString().slice(0, 16) : '',
       isActive: banner.isActive ?? true,
     });
+    setEditTargeting(
+      banner.targeting ? normalizeTargeting(banner.targeting) : emptyTargeting(),
+    );
     setExistingImages(Array.isArray(banner.images) ? banner.images.slice(0, 1) : []);
     setSelectedImages([]);
     setImagePreviews([]);
@@ -260,9 +268,16 @@ const BannerList = () => {
     setIsSubmitting(true);
 
     try {
+      if (isGlobalTargeting(editTargeting) && user?.role !== 'SUPERADMIN') {
+        toast.error('Select at least one location for this banner');
+        setIsSubmitting(false);
+        return;
+      }
+
       const formData = new FormData();
-      
+
       // Append all form fields
+      formData.append('targeting', JSON.stringify(editTargeting));
       formData.append('title', editFormData.title.trim());
       formData.append('subtitle', editFormData.subtitle.trim());
       formData.append('description', editFormData.description.trim());
@@ -970,6 +985,15 @@ const BannerList = () => {
                     </div>
                   )}
                 </div>
+
+                  <div className="mt-6">
+                    <LocationTargetingPicker
+                      value={editTargeting}
+                      onChange={setEditTargeting}
+                      role={user?.role}
+                      description="This banner only appears for customers in the selected locations."
+                    />
+                  </div>
               </div>
             </div>
 

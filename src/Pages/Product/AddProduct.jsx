@@ -20,7 +20,13 @@ import {
   fetchSubCategoriesByCategory,
   createProduct,
   bulkImportProducts,
+  checkDuplicateProduct,
 } from "../../Api";
+import { useAuth } from "../../Context/AuthProvider";
+import { useLocations } from "../../Context/LocationProvider";
+import ProductSectionTabs from "./ProductSectionTabs";
+import ProductLocationsModal from "./ProductLocationsModal";
+import { DuplicateNotice, LocationPicker } from "./AddProductHelpers";
 
 const createVarietyId = () =>
   `variety-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -135,6 +141,7 @@ const bulkImportFieldDocs = [
   ["variety1_originalPrice", "Yes", "Original MRP/list price", "420"],
   ["variety1_discountedPrice", "Yes", "Selling price", "385"],
   ["variety1_isAvailable", "No", "Defaults to true when blank", "true"],
+  ["variety1_stock", "No", "Opening stock of this variety in the chosen warehouse (0 when blank)", "40"],
   ["primaryImage", "No", "Public http/https URL", "https://example.com/main.jpg"],
   ["images", "No", "Multiple public URLs separated by comma, pipe, or new line", "https://example.com/1.jpg,https://example.com/2.jpg"],
   ["badges", "No", "Comma-separated badges, max 6", "Pizza essential,High melt"],
@@ -142,7 +149,9 @@ const bulkImportFieldDocs = [
 const bulkImportRules = [
   "Run Preview import before Import products so category, SKU, image, and variety checks happen first.",
   "Only the first worksheet is imported from Excel files.",
-  "Duplicate SKUs inside the same file are rejected, and existing SKUs cannot be re-imported.",
+  "Duplicate SKUs inside the same file are rejected.",
+  "A row whose SKU (or name + brand + pack size) already exists is NOT created again. It is added to the chosen warehouse with the row's prices and stock. Variety names must match the existing product.",
+  "Choose the warehouse to import into. Prices and stock in the file apply to that warehouse only.",
   "If Auto-create missing categories is off, unmatched categories fail preview/import.",
   "Missing images fall back to the default product image automatically.",
 ];
@@ -209,14 +218,17 @@ const bulkTemplateRows = [
     variety1_originalPrice: 420,
     variety1_discountedPrice: 385,
     variety1_isAvailable: true,
+    variety1_stock: 40,
     variety2_name: "5 kg block",
     variety2_originalPrice: 2050,
     variety2_discountedPrice: 1925,
     variety2_isAvailable: true,
+    variety2_stock: 10,
     variety3_name: "",
     variety3_originalPrice: "",
     variety3_discountedPrice: "",
     variety3_isAvailable: "",
+    variety3_stock: "",
   },
 ];
 
@@ -287,6 +299,7 @@ const extractBulkVarieties = (row) => {
           : ["true", "1", "yes"].includes(
             String(row[`variety${index}_isAvailable`]).trim().toLowerCase()
           ),
+      stockQty: row[`variety${index}_stock`],
     }))
     .filter(
       (variety) =>
@@ -300,6 +313,9 @@ const extractBulkVarieties = (row) => {
       originalPrice: Number(variety.originalPrice),
       discountedPrice: Number(variety.discountedPrice),
       isAvailable: variety.isAvailable,
+      ...(variety.stockQty === "" || variety.stockQty === undefined || variety.stockQty === null
+        ? {}
+        : { stockQty: Math.max(0, Math.floor(Number(variety.stockQty) || 0)) }),
     }));
 };
 
@@ -348,7 +364,16 @@ const normalizeBulkRow = (row) => {
 };
 
 export default function AddProductPage() {
+  const { isSuperAdmin } = useAuth();
+  const { warehouses } = useLocations();
   const [mode, setMode] = useState("manual");
+  // null = untouched: a manager with exactly one warehouse gets it preselected.
+  const [pickedWarehouses, setPickedWarehouses] = useState(null);
+  const [openingStock, setOpeningStock] = useState({});
+  const [duplicates, setDuplicates] = useState({ exact: [], similar: [] });
+  const [duplicateChecking, setDuplicateChecking] = useState(false);
+  const [existingProductId, setExistingProductId] = useState(null);
+  const [bulkWarehouseId, setBulkWarehouseId] = useState("");
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
   const [form, setForm] = useState(createInitialForm);
@@ -366,6 +391,55 @@ export default function AddProductPage() {
   const [createMissingCategories, setCreateMissingCategories] = useState(true);
 
   const maxDesc = 500;
+
+  const selectedWarehouses =
+    pickedWarehouses ??
+    (!isSuperAdmin && warehouses.length === 1 ? [String(warehouses[0]._id)] : []);
+  const effectiveBulkWarehouseId =
+    bulkWarehouseId || (!isSuperAdmin && warehouses.length === 1 ? String(warehouses[0]._id) : "");
+
+  const toggleWarehouse = (id) =>
+    setPickedWarehouses((current) => {
+      const base = current ?? selectedWarehouses;
+      return base.includes(id) ? base.filter((value) => value !== id) : [...base, id];
+    });
+
+  /* One product, many locations: look for the same product while typing. */
+  const identityKey = JSON.stringify({
+    sku: form.sku.trim(),
+    upc: form.upc.trim(),
+    name: form.name.trim(),
+    brand: form.brand.trim(),
+    packSizeLabel: form.packSizeLabel.trim(),
+    unit: form.unit,
+  });
+  useEffect(() => {
+    const identity = JSON.parse(identityKey);
+    if (identity.name.length < 3 && identity.sku.length < 3 && identity.upc.length < 3) {
+      return undefined;
+    }
+    let active = true;
+    const timer = setTimeout(() => {
+      setDuplicateChecking(true);
+      checkDuplicateProduct(identity).then((res) => {
+        if (!active) return;
+        setDuplicateChecking(false);
+        if (res.ok) {
+          setDuplicates({ exact: res.data?.exact || [], similar: res.data?.similar || [] });
+        }
+      });
+    }, 450);
+    return () => {
+      active = false;
+      clearTimeout(timer);
+    };
+  }, [identityKey]);
+
+  const identityIsEmpty = (() => {
+    const identity = JSON.parse(identityKey);
+    return identity.name.length < 3 && identity.sku.length < 3 && identity.upc.length < 3;
+  })();
+  const visibleDuplicates = identityIsEmpty ? { exact: [], similar: [] } : duplicates;
 
   const loadCategories = async () => {
     const res = await fetchCategories();
@@ -547,6 +621,12 @@ export default function AddProductPage() {
       }));
 
   const validateForm = () => {
+    if (visibleDuplicates.exact.length > 0) {
+      return "This product already exists. Use “Add to my location” instead of creating a duplicate.";
+    }
+    if (!isSuperAdmin && selectedWarehouses.length === 0) {
+      return "Choose at least one of your locations to sell this product in";
+    }
     if (!form.name.trim()) return "Product name is required";
     if (!form.category) return "Category is required";
     if (!form.subCategory)
@@ -601,6 +681,8 @@ export default function AddProductPage() {
     images.forEach((image) => URL.revokeObjectURL(image.url));
     setForm(createInitialForm());
     setVarieties([createEmptyVariety()]);
+    setOpeningStock({});
+    setDuplicates({ exact: [], similar: [] });
     setImages([]);
     setPrimaryImageRef("");
     setImageSelectionError("");
@@ -640,7 +722,6 @@ export default function AddProductPage() {
       formData.append("unit", form.unit);
       formData.append("packSizeLabel", form.packSizeLabel.trim());
       formData.append("stock", form.stock.trim());
-      formData.append("stockQuantity", String(Number(form.stockQuantity) || 0));
       formData.append(
         "minOrderQuantity",
         String(Math.max(1, Number(form.minOrderQuantity) || 1))
@@ -663,6 +744,29 @@ export default function AddProductPage() {
       formData.append("displayOrder", String(Number(form.displayOrder) || 0));
       formData.append("badges", JSON.stringify(badgesPreview));
       formData.append("varieties", JSON.stringify(getValidVarieties()));
+      // Where it is sold: same variety prices in each picked location, with
+      // the opening stock entered per variety.
+      if (selectedWarehouses.length) {
+        formData.append(
+          "locations",
+          JSON.stringify({
+            warehouseIds: selectedWarehouses,
+            variants: varieties
+              .filter(
+                (variety) =>
+                  variety.name.trim() &&
+                  variety.originalPrice !== "" &&
+                  variety.discountedPrice !== ""
+              )
+              .map((variety) => ({
+                name: variety.name.trim(),
+                mrp: Number(variety.originalPrice),
+                sellingPrice: Number(variety.discountedPrice),
+                stockQty: Math.max(0, Math.floor(Number(openingStock[variety.id]) || 0)),
+              })),
+          })
+        );
+      }
       formData.append(
         "imageOrder",
         JSON.stringify(images.map((image, index) => getUploadReference(index)))
@@ -679,10 +783,15 @@ export default function AddProductPage() {
       });
 
       const res = await createProduct(formData);
-      if (!res.ok) throw new Error(res.message);
+      if (!res.ok) {
+        if (res.code === "PRODUCT_EXISTS") {
+          setDuplicates({ exact: res.data?.existing || [], similar: [] });
+        }
+        throw new Error(res.message);
+      }
 
-      toast.success("Product created successfully");
-      setMessage({ type: "success", text: "Product added successfully" });
+      toast.success(res.data?.message || "Product created successfully");
+      setMessage({ type: "success", text: res.data?.message || "Product added successfully" });
       resetForm();
     } catch (error) {
       toast.error(error.message || "Server error");
@@ -763,10 +872,14 @@ export default function AddProductPage() {
 
     setBulkLoading(true);
     try {
+      if (!isSuperAdmin && !effectiveBulkWarehouseId) {
+        throw new Error("Choose the warehouse to import into");
+      }
       const res = await bulkImportProducts({
         rows: bulkRows,
         dryRun: true,
         createMissingCategories,
+        ...(effectiveBulkWarehouseId ? { warehouseId: effectiveBulkWarehouseId } : {}),
       });
 
       if (!res.ok) {
@@ -798,6 +911,7 @@ export default function AddProductPage() {
         rows: bulkRows,
         dryRun: false,
         createMissingCategories,
+        ...(effectiveBulkWarehouseId ? { warehouseId: effectiveBulkWarehouseId } : {}),
       });
 
       if (!res.ok) {
@@ -817,6 +931,12 @@ export default function AddProductPage() {
   const renderManualForm = () => (
     <form onSubmit={handleSubmit} className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
       <div className="space-y-6">
+        <DuplicateNotice
+          exact={visibleDuplicates.exact}
+          similar={visibleDuplicates.similar}
+          checking={duplicateChecking && !identityIsEmpty}
+          onUseExisting={setExistingProductId}
+        />
         <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -1242,15 +1362,10 @@ export default function AddProductPage() {
 
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
-                <label className={sectionTitleClass}>Stock quantity</label>
-                <input
-                  type="number"
-                  min="0"
-                  name="stockQuantity"
-                  value={form.stockQuantity}
-                  onChange={handleChange}
-                  className={`${inputClass} mt-1.5`}
-                />
+                <label className={sectionTitleClass}>Stock</label>
+                <p className="mt-1.5 rounded-xl bg-slate-50 px-3 py-2.5 text-xs text-slate-500 ring-1 ring-slate-200">
+                  Stock is kept per location. Enter opening stock in “Where will you sell it?”.
+                </p>
               </div>
               <div>
                 <label className={sectionTitleClass}>Stock note</label>
@@ -1348,6 +1463,17 @@ export default function AddProductPage() {
           </div>
         </section>
 
+        <LocationPicker
+          warehouses={warehouses}
+          selected={selectedWarehouses}
+          onToggle={toggleWarehouse}
+          varieties={varieties.filter((variety) => variety.name.trim())}
+          openingStock={openingStock}
+          onStockChange={(id, value) => setOpeningStock((current) => ({ ...current, [id]: value }))}
+          required={!isSuperAdmin}
+          inputClass={inputClass}
+        />
+
         <section className="rounded-3xl bg-slate-950 p-5 text-white shadow-sm">
           <div className="mb-3">
             <h2 className="text-lg font-semibold">Publish</h2>
@@ -1356,7 +1482,12 @@ export default function AddProductPage() {
             </p>
           </div>
           <button
-            disabled={loading}
+            disabled={loading || visibleDuplicates.exact.length > 0}
+            title={
+              visibleDuplicates.exact.length > 0
+                ? "This product already exists — add it to your location instead"
+                : undefined
+            }
             className="w-full rounded-2xl bg-emerald-500 px-4 py-3 text-sm font-semibold text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-emerald-300"
           >
             {loading ? "Creating product..." : "Create product"}
@@ -1407,6 +1538,31 @@ export default function AddProductPage() {
               </p>
             </div>
           </div>
+
+          <label className="mb-3 block">
+            <span className={sectionTitleClass}>
+              Import into warehouse {isSuperAdmin ? "(optional — empty = catalogue only)" : ""}
+            </span>
+            <select
+              value={effectiveBulkWarehouseId}
+              onChange={(e) => {
+                setBulkWarehouseId(e.target.value);
+                setBulkPreview(null);
+              }}
+              className={`${inputClass} mt-1.5`}
+            >
+              <option value="">{isSuperAdmin ? "Catalogue only (no location)" : "Choose a warehouse"}</option>
+              {warehouses.map((warehouse) => (
+                <option key={warehouse._id} value={warehouse._id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">
+              Products already in the catalogue are not duplicated. They are added to this warehouse with the
+              file's prices and stock.
+            </span>
+          </label>
 
           <input
             type="file"
@@ -1583,6 +1739,9 @@ export default function AddProductPage() {
 
             <div className="rounded-2xl bg-sky-50 p-4 text-sm text-sky-800 ring-1 ring-sky-200">
               Categories to create automatically: {bulkPreview.summary?.createdCategories ?? 0}
+              {bulkPreview.actionSummary
+                ? ` • New: ${bulkPreview.actionSummary.create} • Add existing to ${bulkPreview.warehouse?.name || "warehouse"}: ${bulkPreview.actionSummary.link} • Skipped: ${bulkPreview.actionSummary.skip}`
+                : ""}
             </div>
 
             <div className="max-h-[460px] space-y-3 overflow-y-auto pr-1">
@@ -1608,12 +1767,23 @@ export default function AddProductPage() {
                       </div>
                     </div>
                     <span
-                      className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${row.errors?.length > 0
+                      className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-semibold ${row.errors?.length > 0
                         ? "bg-rose-100 text-rose-700"
-                        : "bg-emerald-100 text-emerald-700"
+                        : row.action === "link"
+                          ? "bg-sky-100 text-sky-700"
+                          : row.action === "skip"
+                            ? "bg-slate-200 text-slate-600"
+                            : "bg-emerald-100 text-emerald-700"
                         }`}
+                      title={row.existingProductName ? `Existing product: ${row.existingProductName}` : undefined}
                     >
-                      {row.errors?.length > 0 ? "Needs fixes" : "Ready"}
+                      {row.errors?.length > 0
+                        ? "Needs fixes"
+                        : row.action === "link"
+                          ? "Exists → add to warehouse"
+                          : row.action === "skip"
+                            ? "Already in catalogue"
+                            : "New product"}
                     </span>
                   </div>
 
@@ -1647,6 +1817,8 @@ export default function AddProductPage() {
           </p>
         </div>
 
+        <ProductSectionTabs />
+
         <div className="mb-6 inline-flex rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
           {[
             { value: "manual", label: "Manual add" },
@@ -1668,6 +1840,13 @@ export default function AddProductPage() {
 
         {mode === "manual" ? renderManualForm() : renderBulkSection()}
       </div>
+
+      <ProductLocationsModal
+        open={Boolean(existingProductId)}
+        productId={existingProductId}
+        onClose={() => setExistingProductId(null)}
+        onChanged={() => toast.success("Your location now sells this product")}
+      />
     </div>
   );
 }

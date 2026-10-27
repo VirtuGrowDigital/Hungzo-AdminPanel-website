@@ -1,209 +1,50 @@
 import React, { useMemo } from "react";
 import { Link, NavLink, useLocation } from "react-router-dom";
-import {
-  ArchiveBoxIcon,
-  ArrowRightOnRectangleIcon,
-  BellAlertIcon,
-  BuildingOffice2Icon,
-  BuildingStorefrontIcon,
-  ClipboardDocumentListIcon,
-  ClockIcon,
-  Cog6ToothIcon,
-  CubeIcon,
-  DocumentTextIcon,
-  TruckIcon,
-  UserGroupIcon,
-  UserPlusIcon,
-} from "@heroicons/react/24/solid";
-import { ChevronRight, Gift, Scale, ShieldCheck, Wallet } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import logo from "../assets/Logo.png";
 import { useAuth } from "../Context/AuthProvider";
+import { buildNavigation } from "../Config/navigation";
+import { ROLE_LABELS, hasPermission } from "../Config/permissions";
 
-const adminMenu = [
-  {
-    label: "Products",
-    icon: CubeIcon,
-    children: [
-      { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
-      { to: "/product/add", label: "Add Products", icon: CubeIcon },
-      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
-      {
-        to: "/product/categories",
-        label: "Category Management",
-        icon: CubeIcon,
-      },
-      {
-        to: "/product/subcategories",
-        label: "SubCategory Management",
-        icon: CubeIcon,
-      },
-    ],
-  },
-  { to: "/orders", label: "Orders", icon: ClipboardDocumentListIcon },
-  {
-    label: "Users",
-    icon: BuildingOffice2Icon,
-    children: [
-      { to: "/users/profiles", label: "Profiles", icon: BuildingOffice2Icon },
-      {
-        to: "/users/deletion-requests",
-        label: "Deletion Requests",
-        icon: DocumentTextIcon,
-      },
-    ],
-  },
-  { to: "/banner", label: "Banner", icon: ArchiveBoxIcon },
-  { to: "/warehouse", label: "Warehouse", icon: BuildingStorefrontIcon },
-  { to: "/business-hours", label: "Business Hours", icon: ClockIcon },
-  { to: "/app-configuration", label: "App Configuration", icon: Cog6ToothIcon },
-  { to: "/policies", label: "Policies", icon: DocumentTextIcon },
-  { to: "/legal-details", label: "Legal Details", icon: ShieldCheck },
-  { to: "/notification", label: "Notifications", icon: BellAlertIcon },
-  {
-    label: "Offers",
-    icon: Gift,
-    children: [{ to: "/offers/wallet", label: "Wallet Offers", icon: Wallet }],
-  },
-  { to: "/Terms", label: "Terms & Rules", icon: Scale },
-  { to: "/logout", label: "Logout", icon: ArrowRightOnRectangleIcon },
-];
+/**
+ * The sidebar is a pure renderer of Config/navigation.js, filtered by the
+ * permissions the API reported for this admin (GET /admin/me).
+ *
+ * There is no per-role menu here on purpose: adding a role on the server
+ * changes what appears with no frontend release, and a role can never be
+ * shown a screen the API would reject.
+ */
 
-const superAdminMenu = [
-  {
-    label: "Products",
-    icon: CubeIcon,
-    children: [
-      { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
-      { to: "/product/add", label: "Add Products", icon: CubeIcon },
-      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
-      {
-        to: "/product/categories",
-        label: "Category Management",
-        icon: CubeIcon,
-      },
-      {
-        to: "/product/subcategories",
-        label: "SubCategory Management",
-        icon: CubeIcon,
-      },
-    ],
-  },
-  { to: "/orders", label: "Orders", icon: ClipboardDocumentListIcon },
-  {
-    label: "Users",
-    icon: BuildingOffice2Icon,
-    children: [
-      { to: "/users/profiles", label: "Profiles", icon: BuildingOffice2Icon },
-      { to: "/users/buyer-gst", label: "Buyer GST", icon: DocumentTextIcon },
-      {
-        to: "/users/deletion-requests",
-        label: "Deletion Requests",
-        icon: DocumentTextIcon,
-      },
-    ],
-  },
-  {
-    to: "/verification",
-    label: "Verification",
-    icon: ClipboardDocumentListIcon,
-  },
-  { to: "/drivers", label: "Drivers", icon: TruckIcon },
-  { to: "/admin", label: "Admins", icon: UserGroupIcon },
-  { to: "/add-admin", label: "Add Admin", icon: UserPlusIcon },
-  { to: "/banner", label: "Banner", icon: ArchiveBoxIcon },
-  { to: "/warehouse", label: "Warehouse", icon: BuildingStorefrontIcon },
-  { to: "/business-hours", label: "Business Hours", icon: ClockIcon },
-  { to: "/app-configuration", label: "App Configuration", icon: Cog6ToothIcon },
-  { to: "/policies", label: "Policies", icon: DocumentTextIcon },
-  { to: "/legal-details", label: "Legal Details", icon: ShieldCheck },
-  { to: "/notification", label: "Notifications", icon: BellAlertIcon },
-  { to: "/walletDetails", label: "Wallet", icon: Wallet },
-  {
-    label: "Offers",
-    icon: Gift,
-    children: [{ to: "/offers/wallet", label: "Wallet Offers", icon: Wallet }],
-  },
-  { to: "/Terms", label: "Terms & Rules", icon: Scale },
-  { to: "/logout", label: "Logout", icon: ArrowRightOnRectangleIcon },
-];
+function SingleLink({ item }) {
+  const Icon = item.icon;
 
-const subAdminMenu = [
-  {
-    label: "Products",
-    icon: CubeIcon,
-    children: [
-      { to: "/product/inventory", label: "Inventory", icon: CubeIcon },
-      { to: "/product/add", label: "Add Products", icon: CubeIcon },
-      { to: "/product/bulk-images", label: "Bulk Images", icon: CubeIcon },
-      {
-        to: "/product/categories",
-        label: "Category Management",
-        icon: CubeIcon,
-      },
-      {
-        to: "/product/subcategories",
-        label: "SubCategory Management",
-        icon: CubeIcon,
-      },
-    ],
-  },
-  {
-    to: "/orders",
-    label: "Orders",
-    icon: ClipboardDocumentListIcon,
-  },
-  {
-    to: "/logout",
-    label: "Logout",
-    icon: ArrowRightOnRectangleIcon,
-  },
-];
-
-const buildMenuSections = (menuItems) => {
-  const primary = [];
-  const operations = [];
-  const system = [];
-
-  menuItems.forEach((item) => {
-    const target = item.to || item.label;
-
-    if (
-      [
-        "/orders",
-        "/verification",
-        "/drivers",
-        "/walletDetails",
-        "/warehouse",
-        "/business-hours",
-      ].includes(target)
-    ) {
-      operations.push(item);
-      return;
-    }
-
-    if (
-      [
-        "/app-configuration",
-        "/policies",
-        "/legal-details",
-        "/notification",
-        "/Terms",
-        "/logout",
-      ].includes(target)
-    ) {
-      system.push(item);
-      return;
-    }
-
-    primary.push(item);
-  });
-
-  return [
-    { title: "Workspace", items: primary },
-    { title: "Operations", items: operations },
-    { title: "System", items: system },
-  ].filter((section) => section.items.length > 0);
-};
+  return (
+    <NavLink
+      to={item.to}
+      end={item.to === "/"}
+      className={({ isActive }) =>
+        `group flex items-center gap-3 rounded-2xl px-3 py-2 text-sm transition ${
+          isActive
+            ? "bg-white text-slate-900 shadow-sm"
+            : "text-white/70 hover:bg-white/8 hover:text-white"
+        }`
+      }
+    >
+      {({ isActive }) => (
+        <>
+          <span
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+              isActive ? "bg-emerald-500 text-white" : "bg-white/8 text-white/70"
+            }`}
+          >
+            {Icon ? <Icon className="h-4 w-4" /> : null}
+          </span>
+          <span className="min-w-0 flex-1 font-medium">{item.label}</span>
+        </>
+      )}
+    </NavLink>
+  );
+}
 
 function ParentGroup({ item, pathname }) {
   const Icon = item.icon;
@@ -213,17 +54,15 @@ function ParentGroup({ item, pathname }) {
     <div className="space-y-1.5">
       <div
         className={`flex items-center gap-3 rounded-2xl px-3 py-2 transition ${
-          isActiveGroup ? "bg-white/10 text-white" : "text-white/72"
+          isActiveGroup ? "bg-white/10 text-white" : "text-white/70"
         }`}
       >
         <div
           className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-            isActiveGroup
-              ? "bg-emerald-500 text-white"
-              : "bg-white/8 text-white/70"
+            isActiveGroup ? "bg-emerald-500 text-white" : "bg-white/8 text-white/70"
           }`}
         >
-          <Icon className="h-4 w-4" />
+          {Icon ? <Icon className="h-4 w-4" /> : null}
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-white">{item.label}</p>
@@ -241,11 +80,11 @@ function ParentGroup({ item, pathname }) {
                 `group flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm transition ${
                   isActive
                     ? "bg-white text-slate-900 shadow-sm"
-                    : "text-white/62 hover:bg-white/7 hover:text-white"
+                    : "text-white/60 hover:bg-white/8 hover:text-white"
                 }`
               }
             >
-              <ChildIcon className="h-3.5 w-3.5 shrink-0" />
+              {ChildIcon ? <ChildIcon className="h-3.5 w-3.5 shrink-0" /> : null}
               <span className="min-w-0 flex-1 font-medium">{child.label}</span>
               <ChevronRight className="h-3.5 w-3.5 opacity-45 transition group-hover:translate-x-0.5" />
             </NavLink>
@@ -256,121 +95,87 @@ function ParentGroup({ item, pathname }) {
   );
 }
 
-function SingleLink({ item }) {
-  const Icon = item.icon;
-
-  return (
-    <NavLink
-      to={item.to}
-      className={({ isActive }) =>
-        `group flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm transition ${
-          isActive
-            ? "bg-white text-slate-900 shadow-sm"
-            : "text-white/72 hover:bg-white/7 hover:text-white"
-        }`
-      }
-    >
-      <div
-        className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-          item.to === "/logout"
-            ? "bg-rose-500/14 text-rose-200"
-            : "bg-white/8 text-current"
-        }`}
-      >
-        <Icon className="h-4 w-4" />
-      </div>
-      <span className="min-w-0 flex-1 font-medium">{item.label}</span>
-      <ChevronRight className="h-3.5 w-3.5 opacity-45 transition group-hover:translate-x-0.5" />
-    </NavLink>
-  );
-}
-
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, permissions, scope, profileLoading } = useAuth();
   const location = useLocation();
+
+  const sections = useMemo(
+    () => buildNavigation(permissions, hasPermission),
+    [permissions],
+  );
 
   if (!user) return null;
 
-  const menuItems =
-    user.role === "SUPERADMIN"
-      ? superAdminMenu
-      : user.role === "ADMIN"
-        ? adminMenu
-        : user.role === "SUBADMIN"
-          ? subAdminMenu
-          : [];
-
-  const sections = useMemo(() => buildMenuSections(menuItems), [menuItems]);
-  const roleLabel =
-    user.role === "SUPERADMIN"
-      ? "Signed in as Super Admin"
-      : user.role === "SUBADMIN"
-        ? "Signed in as Sub Admin"
-        : "Signed in as Admin";
+  const roleLabel = ROLE_LABELS[user.role] || user.role || "Admin";
+  const scopeCount =
+    (scope?.cityIds?.length || 0) +
+    (scope?.stateIds?.length || 0) +
+    (scope?.warehouseIds?.length || 0);
 
   return (
     <aside className="sticky top-0 h-screen w-64 shrink-0 overflow-hidden border-r border-slate-800/80 bg-[linear-gradient(180deg,#0b1220_0%,#0f172a_52%,#111827_100%)] px-4 py-4 text-white">
       <div className="flex h-full flex-col">
-        <Link
-          to="/"
-          className="rounded-2xl px-2 py-2 transition hover:bg-white/4"
-        >
+        <Link to="/" className="rounded-2xl px-2 py-2 transition hover:bg-white/5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white">
-              <img src={logo} alt="logo" className="h-7 w-7" />
+              <img src={logo} alt="Hungzo" className="h-7 w-7" />
             </div>
-            <div className="min-w-0 flex flex-col justify-center leading-none">
-              <p className="text-base font-semibold tracking-tight text-white">
-                Hungzo
-              </p>
-              <p className="mt-1 text-[10px] uppercase tracking-[0.2em] text-white/38">
+            <div className="flex min-w-0 flex-col justify-center leading-none">
+              <p className="text-base font-semibold tracking-tight text-white">Hungzo</p>
+              <p className="mt-1 truncate text-[10px] uppercase tracking-[0.2em] text-white/40">
                 {roleLabel}
               </p>
             </div>
           </div>
         </Link>
 
+        {user.role && user.role !== "SUPERADMIN" ? (
+          <p className="mt-2 px-2 text-[10px] text-white/35">
+            {scopeCount
+              ? `Scoped to ${scopeCount} location${scopeCount === 1 ? "" : "s"}`
+              : "No scope assigned"}
+          </p>
+        ) : null}
+
         <div
           className="mt-4 min-h-0 flex-1 overflow-y-auto pr-1"
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
-          <nav className="space-y-4">
-            {sections.map((section) => (
-              <div key={section.title}>
-                <div className="mb-2 px-3">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/28">
-                    {section.title}
-                  </p>
-                </div>
+          {!sections.length ? (
+            <p className="px-3 py-6 text-xs leading-5 text-white/50">
+              {profileLoading
+                ? "Loading your access..."
+                : "No screens are available for your role yet. Ask a super admin to review your access."}
+            </p>
+          ) : (
+            <nav className="space-y-4">
+              {sections.map((section) => (
+                <div key={section.id}>
+                  <div className="mb-2 px-3">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/30">
+                      {section.title}
+                    </p>
+                  </div>
 
-                <div className="space-y-1">
-                  {section.items.map((item) =>
-                    item.children?.length ? (
-                      <ParentGroup
-                        key={item.label}
-                        item={item}
-                        pathname={location.pathname}
-                      />
-                    ) : (
-                      <SingleLink key={item.to} item={item} />
-                    ),
-                  )}
+                  <div className="space-y-1">
+                    {section.items.map((item) =>
+                      item.children?.length ? (
+                        <ParentGroup
+                          key={item.label}
+                          item={item}
+                          pathname={location.pathname}
+                        />
+                      ) : (
+                        <SingleLink key={item.to} item={item} />
+                      ),
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
-          </nav>
-        </div>
-
-        <div className="mt-3 px-3 py-2 text-[11px] text-white/38">
-          © {new Date().getFullYear()} Hungzo Admin Panel
+              ))}
+            </nav>
+          )}
         </div>
       </div>
-
-      <style>{`
-        div[style*="scrollbar-width: none"]::-webkit-scrollbar {
-          display: none !important;
-        }
-      `}</style>
     </aside>
   );
 }

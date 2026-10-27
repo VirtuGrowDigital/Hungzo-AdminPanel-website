@@ -2,6 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
 import { createBanner, fetchCategories, myProducts } from "../../Api";
+import LocationTargetingPicker from "../../Components/LocationTargetingPicker";
+import { emptyTargeting, isGlobalTargeting } from "../../Api/multicity";
+import { useAuth } from "../../Context/AuthProvider";
 import {
   ALLOWED_BANNER_IMAGE_MIME_TYPES,
   MAX_BANNER_IMAGE_SIZE_MB,
@@ -33,6 +36,8 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
   const [formErrors, setFormErrors] = useState({});
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [targeting, setTargeting] = useState(emptyTargeting());
+  const { user } = useAuth();
 
   useEffect(() => {
     loadReferenceData();
@@ -253,7 +258,15 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
     setIsSubmitting(true);
 
     try {
+      if (isGlobalTargeting(targeting) && user?.role !== "SUPERADMIN") {
+        toast.error("Select at least one location for this banner");
+        setIsSubmitting(false);
+        return;
+      }
+
       const formData = new FormData();
+      // Location targeting: empty arrays = every city (super admin only).
+      formData.append("targeting", JSON.stringify(targeting));
       formData.append("title", form.title.trim());
       formData.append("subtitle", form.subtitle.trim());
       formData.append("description", form.description.trim());
@@ -518,6 +531,15 @@ const AddBanner = ({ onBack, onBannerCreated }) => {
                 No image selected yet.
               </div>
             )}
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4">
+            <LocationTargetingPicker
+              value={targeting}
+              onChange={setTargeting}
+              role={user?.role}
+              description="This banner only appears for customers in the selected locations. Leave empty for all cities (super admin only)."
+            />
           </section>
 
           <div className="flex gap-3">

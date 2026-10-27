@@ -35,7 +35,7 @@ const findTaxLine = (taxLines, item) => {
     "";
   return (
     taxLines.find(
-      (line) => line.itemType === "PRODUCT" && line.itemId === matchId
+      (line) => line.itemType === "PRODUCT" && line.itemId === matchId,
     ) || null
   );
 };
@@ -56,15 +56,15 @@ const buildChargeRows = (order, taxDetails, taxSummary) => {
       line: deliveryLine,
       taxableValue: asNumber(
         deliveryLine?.taxableValue,
-        taxSummary.deliveryTaxableValue ?? order.deliveryCharge
+        taxSummary.deliveryTaxableValue ?? order.deliveryCharge,
       ),
     },
     {
-      label: "Platform fee",
+      label: "Handling fee",
       line: platformLine,
       taxableValue: asNumber(
         platformLine?.taxableValue,
-        taxSummary.platformFeeTaxableValue ?? order.platformFee
+        taxSummary.platformFeeTaxableValue ?? order.platformFee,
       ),
     },
   ].filter((row) => row.taxableValue > 0);
@@ -74,11 +74,14 @@ const buildItemRows = (orderItems, taxLines) =>
   orderItems.map((item, index) => {
     const taxLine = findTaxLine(taxLines, item);
     const originalPrice = asNumber(item.originalPrice);
-    const discountedPrice = asNumber(item.discountedPrice, asNumber(item.price));
+    const discountedPrice = asNumber(
+      item.discountedPrice,
+      asNumber(item.price),
+    );
     const qty = asNumber(item.quantity, asNumber(item.qty, 0));
     const discountAmount = asNumber(
       item.discountAmount,
-      Math.max(0, (originalPrice - discountedPrice) * qty)
+      Math.max(0, (originalPrice - discountedPrice) * qty),
     );
 
     return {
@@ -93,7 +96,7 @@ const buildItemRows = (orderItems, taxLines) =>
       quantity: qty,
       taxableValue: asNumber(
         taxLine?.taxableValue,
-        item.taxableValue ?? item.total ?? 0
+        item.taxableValue ?? item.total ?? 0,
       ),
       cgstRate: asNumber(taxLine?.cgstRate),
       cgstAmount: asNumber(taxLine?.cgstAmount),
@@ -104,11 +107,11 @@ const buildItemRows = (orderItems, taxLines) =>
       cessRate: asNumber(taxLine?.cessRate),
       cessAmount: asNumber(
         taxLine?.cessAmount,
-        asNumber(taxLine?.additionalCessAmount)
+        asNumber(taxLine?.additionalCessAmount),
       ),
       totalAmount: asNumber(
         taxLine?.grossAmount,
-        item.grossAmount ?? item.lineTotal ?? item.total ?? 0
+        item.grossAmount ?? item.lineTotal ?? item.total ?? 0,
       ),
     };
   });
@@ -166,7 +169,7 @@ const buildInvoiceHtml = ({
           <td class="num">${row.cessAmount.toFixed(2)}</td>
           <td class="num">${row.totalAmount.toFixed(2)}</td>
         </tr>
-      `
+      `,
     )
     .join("");
 
@@ -183,7 +186,7 @@ const buildInvoiceHtml = ({
           <td class="num">${asNumber(row.line?.sgstAmount).toFixed(2)}</td>
           <td class="num">${asNumber(row.line?.igstAmount).toFixed(2)}</td>
         </tr>
-      `
+      `,
     )
     .join("");
 
@@ -273,7 +276,7 @@ const buildInvoiceHtml = ({
           <div class="title">Tax Invoice</div>
           <div class="muted">Sold By / Seller</div>
           <div style="font-weight:700;font-size:16px;">${escapeHtml(
-            legalDetails.legalBusinessName || "Hungzo"
+            legalDetails.legalBusinessName || "Hungzo",
           )}</div>
           ${
             clean(legalDetails.tradeName)
@@ -294,7 +297,7 @@ const buildInvoiceHtml = ({
           ${
             clean(legalDetails.fssaiLicenseNumber)
               ? `<div><strong>FSSAI License Number:</strong> ${escapeHtml(
-                  legalDetails.fssaiLicenseNumber
+                  legalDetails.fssaiLicenseNumber,
                 )}</div>`
               : ""
           }
@@ -315,14 +318,14 @@ const buildInvoiceHtml = ({
           <div><strong>Order ID:</strong> ${safeOrderId}</div>
           <div><strong>Invoice Date:</strong> ${orderDate.toLocaleDateString(
             "en-IN",
-            { day: "2-digit", month: "short", year: "numeric" }
+            { day: "2-digit", month: "short", year: "numeric" },
           )}</div>
           <div><strong>Place of Supply:</strong> ${safePlaceOfSupply}</div>
           <div><strong>Reverse Charge:</strong> ${
             legalDetails.reverseChargeApplicable ? "Yes" : "No"
           }</div>
           <div><strong>Payment Method:</strong> ${escapeHtml(
-            order.paymentMethod || "N/A"
+            order.paymentMethod || "N/A",
           )}</div>
         </div>
       </div>
@@ -334,12 +337,12 @@ const buildInvoiceHtml = ({
             order.userDetails?.gstLegalName ||
               order.userDetails?.name ||
               order.user?.email ||
-              "N/A"
+              "N/A",
           )}</div>
           ${
             clean(order.userDetails?.gstTradeName)
               ? `<div><strong>Trade Name:</strong> ${escapeHtml(
-                  order.userDetails.gstTradeName
+                  order.userDetails.gstTradeName,
                 )}</div>`
               : ""
           }
@@ -358,21 +361,21 @@ const buildInvoiceHtml = ({
                     ]
                       .filter(Boolean)
                       .join(", ") ||
-                    order.userDetails?.address
+                    order.userDetails?.address,
                 )}</div>`
               : ""
           }
           ${
             clean(order.userDetails?.gstPincode || order.userDetails?.pincode)
               ? `<div><strong>Pin code:</strong> ${escapeHtml(
-                  order.userDetails?.gstPincode || order.userDetails?.pincode
+                  order.userDetails?.gstPincode || order.userDetails?.pincode,
                 )}</div>`
               : ""
           }
           ${
             clean(order.userDetails?.gstState || order.userDetails?.state)
               ? `<div><strong>State:</strong> ${escapeHtml(
-                  order.userDetails?.gstState || order.userDetails?.state
+                  order.userDetails?.gstState || order.userDetails?.state,
                 )}</div>`
               : ""
           }
@@ -384,7 +387,7 @@ const buildInvoiceHtml = ({
           ${
             clean(order.userDetails?.gstNumber)
               ? `<div><strong>GSTIN:</strong> ${escapeHtml(
-                  order.userDetails.gstNumber
+                  order.userDetails.gstNumber,
                 )}</div>`
               : ""
           }
@@ -393,33 +396,33 @@ const buildInvoiceHtml = ({
         <div class="box">
           <div class="section-title">Seller Legal Details</div>
           <div><strong>Business:</strong> ${escapeHtml(
-            legalDetails.legalBusinessName || "Hungzo"
+            legalDetails.legalBusinessName || "Hungzo",
           )}</div>
           ${
             clean(legalDetails.authorizedSignatoryName)
               ? `<div><strong>Authorised Signatory:</strong> ${escapeHtml(
-                  legalDetails.authorizedSignatoryName
+                  legalDetails.authorizedSignatoryName,
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.authorizedSignatoryDesignation)
               ? `<div><strong>Designation:</strong> ${escapeHtml(
-                  legalDetails.authorizedSignatoryDesignation
+                  legalDetails.authorizedSignatoryDesignation,
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.supportEmail)
               ? `<div><strong>Support Email:</strong> ${escapeHtml(
-                  legalDetails.supportEmail
+                  legalDetails.supportEmail,
                 )}</div>`
               : ""
           }
           ${
             clean(legalDetails.supportPhone)
               ? `<div><strong>Support Phone:</strong> ${escapeHtml(
-                  legalDetails.supportPhone
+                  legalDetails.supportPhone,
                 )}</div>`
               : ""
           }
@@ -494,7 +497,7 @@ const buildInvoiceHtml = ({
             <tr>
               <td>Taxable Value</td>
               <td class="num">${money(
-                taxSummary.productsTaxableValue ?? order.subTotal
+                taxSummary.productsTaxableValue ?? order.subTotal,
               )}</td>
             </tr>
             <tr>
@@ -504,13 +507,13 @@ const buildInvoiceHtml = ({
                   : "Delivery charges"
               }</td>
               <td class="num">${money(
-                taxSummary.deliveryTaxableValue ?? order.deliveryCharge
+                taxSummary.deliveryTaxableValue ?? order.deliveryCharge,
               )}</td>
             </tr>
             <tr>
-              <td>Platform Fee</td>
+              <td>Handling fee</td>
               <td class="num">${money(
-                taxSummary.platformFeeTaxableValue ?? order.platformFee
+                taxSummary.platformFeeTaxableValue ?? order.platformFee,
               )}</td>
             </tr>
             ${
@@ -535,7 +538,7 @@ const buildInvoiceHtml = ({
             <tr>
               <td>Total GST</td>
               <td class="num">${money(
-                taxSummary.totalTaxAmount ?? order.gstAmount
+                taxSummary.totalTaxAmount ?? order.gstAmount,
               )}</td>
             </tr>
             <tr class="grand">
@@ -609,7 +612,7 @@ export const generateInvoice = async (order) => {
         backgroundColor: "#ffffff",
         width: 1120,
         windowWidth: 1120,
-      }
+      },
     );
 
     const pdf = new jsPDF({
@@ -626,21 +629,14 @@ export const generateInvoice = async (order) => {
     const imageHeight = canvas.height;
     const scale = Math.min(
       availableWidth / imageWidth,
-      availableHeight / imageHeight
+      availableHeight / imageHeight,
     );
     const renderWidth = imageWidth * scale;
     const renderHeight = imageHeight * scale;
     const offsetX = (pageWidth - renderWidth) / 2;
     const offsetY = (pageHeight - renderHeight) / 2;
 
-    pdf.addImage(
-      canvas,
-      "PNG",
-      offsetX,
-      offsetY,
-      renderWidth,
-      renderHeight
-    );
+    pdf.addImage(canvas, "PNG", offsetX, offsetY, renderWidth, renderHeight);
 
     const filename = `Invoice_${invoiceNumber.replace(/[^A-Z0-9/-]/gi, "_")}.pdf`;
     pdf.save(filename);

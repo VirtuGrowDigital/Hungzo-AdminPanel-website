@@ -22,11 +22,11 @@ const TABS = [
     label: "Rejected Drivers",
     icon: XCircle,
   },
-  {
-    id: "DriverEarnings",
-    label: "Driver Earnings",
-    icon: HandCoinsIcon,
-  },
+  // {
+  //   id: "DriverEarnings",
+  //   label: "Driver Earnings",
+  //   icon: HandCoinsIcon,
+  // },
 ];
 
 const Drivers = () => {

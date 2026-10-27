@@ -845,7 +845,7 @@ const OrderDetailsModal = ({ order, onClose, onPrintInvoice }) => (
               <span>₹{order.subTotal}</span>
             </div>
             <div className="flex justify-between gap-4">
-              <span>Platform Fee</span>
+              <span>Handling fee</span>
               <span>₹{order.platformFee}</span>
             </div>
             <div className="flex justify-between gap-4">

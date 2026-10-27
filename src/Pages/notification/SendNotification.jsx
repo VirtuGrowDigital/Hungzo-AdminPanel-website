@@ -12,6 +12,9 @@ import {
   Wallet,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import LocationTargetingPicker from '../../Components/LocationTargetingPicker';
+import { emptyTargeting, isGlobalTargeting } from '../../Api/multicity';
+import { useAuth } from '../../Context/AuthProvider';
 import { createNotificationCampaign } from '../../Api';
 
 const audienceOptions = [
@@ -55,6 +58,8 @@ const baseFieldClassName =
 
 const SendNotification = ({ onSent }) => {
   const [audienceType, setAudienceType] = useState('PUSH_ENABLED_USERS');
+  const [targeting, setTargeting] = useState(emptyTargeting());
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [imageUrl, setImageUrl] = useState('');
@@ -88,10 +93,19 @@ const SendNotification = ({ onSent }) => {
 
     try {
       setIsSubmitting(true);
+      if (isGlobalTargeting(targeting) && user?.role !== 'SUPERADMIN') {
+        toast.error('Select at least one location for this campaign');
+        setIsSubmitting(false);
+        return;
+      }
+
       const result = await createNotificationCampaign({
         title: title.trim(),
         body: message.trim(),
         audienceType,
+        // Only users with an address in (or whose last order was in) these
+        // locations receive the push.
+        targeting,
         actionType,
         actionLabel: actionLabel.trim() || 'Open app',
         actionUrl: actionType === 'OPEN_URL' ? actionUrl.trim() : '',
@@ -147,6 +161,15 @@ const SendNotification = ({ onSent }) => {
               <Send className="h-4 w-4" />
               {isSubmitting ? 'Sending...' : 'Send Campaign'}
             </button>
+          </div>
+
+          <div className="mt-5">
+            <LocationTargetingPicker
+              value={targeting}
+              onChange={setTargeting}
+              role={user?.role}
+              description="Only users with a saved address in these locations (or whose last order was there) receive this push. A Gwalior sale blasted to Lucknow burns trust."
+            />
           </div>
         </div>
 

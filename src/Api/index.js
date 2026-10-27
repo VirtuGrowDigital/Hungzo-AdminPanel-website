@@ -1,7 +1,9 @@
 import axios from "axios";
 
-const API_BASE = "https://api.hungzo.in";
-// const API_BASE = "http://10.32.147.13:4000";
+// Set VITE_API_URL in .env to point at a local backend, e.g.
+//   VITE_API_URL=http://localhost:4000
+const API_BASE =
+  import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "https://api.hungzo.in";
 
 const API = axios.create({
   baseURL: API_BASE,
@@ -51,6 +53,16 @@ function getSharedGetRequest(key, requestFactory, cacheMs = 1000) {
   return promise;
 }
 
+// Any successful write (POST/PUT/PATCH/DELETE) can change what the cached
+// GETs return, so drop them. Without this, a list reloaded within the cache
+// window after create/update/delete showed stale data (e.g. a new warehouse
+// missing from the list until a page refresh).
+API.interceptors.response.use((response) => {
+  const method = String(response?.config?.method || "get").toLowerCase();
+  if (method !== "get") sharedGetState.clear();
+  return response;
+});
+
 // Attach token automatically
 API.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
@@ -62,7 +74,7 @@ API.interceptors.request.use((config) => {
 
 export default API;
 
-// ================= create ADMINS ================
+// ================= create ADMINS ===============
 export async function createAdmin(formData) {
   try {
     const res = await API.post("/admin/create", formData);
@@ -800,7 +812,70 @@ export async function createProduct(formData) {
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to create product",
+      // PRODUCT_EXISTS carries `existing` so the UI can offer
+      // "add it to my location" instead of creating a duplicate.
+      code: error.response?.data?.code || null,
+      data: error.response?.data,
     };
+  }
+}
+
+/* ================= MULTI-LOCATION CATALOGUE ================= */
+
+const catalogueError = (error, fallback) => ({
+  ok: false,
+  message: error.response?.data?.message || fallback,
+  code: error.response?.data?.code || null,
+  errors: error.response?.data?.errors || [],
+  data: error.response?.data,
+});
+
+/** Does a product with this SKU / UPC / name+brand+pack already exist? */
+export async function checkDuplicateProduct(params = {}) {
+  try {
+    const res = await API.get("/products/admin/check-duplicate", { params });
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return catalogueError(error, "Duplicate check failed");
+  }
+}
+
+/** Price / stock of one product in every location the admin manages. */
+export async function getProductLocations(productId) {
+  try {
+    const res = await API.get(`/products/admin/${productId}/locations`);
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return catalogueError(error, "Failed to load locations");
+  }
+}
+
+/**
+ * Save price / stock per location (creates the listing if missing).
+ * payload: { rows: [{ warehouseId, variantId, mrp, sellingPrice, stockQty, isAvailable, maxPerOrder }] }
+ *      or  { warehouseIds: [...], variants: [{ variantId|name, mrp, sellingPrice, stockQty }] }
+ */
+export async function saveProductLocations(productId, payload) {
+  try {
+    const res = await API.put(
+      `/products/admin/${productId}/locations`,
+      payload,
+    );
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return catalogueError(error, "Failed to save prices and stock");
+  }
+}
+
+/** Stop selling a product in one location (keeps the catalogue record). */
+export async function removeProductLocation(productId, warehouseId) {
+  try {
+    const res = await API.delete(
+      `/products/admin/${productId}/locations/${warehouseId}`,
+    );
+    return { ok: true, data: res.data };
+  } catch (error) {
+    return catalogueError(error, "Failed to remove product from location");
   }
 }
 
@@ -865,7 +940,8 @@ export async function getProductById(id) {
 /* ================= MY PRODUCTS (ADMIN) ================= */
 export async function myProducts(params = {}) {
   try {
-    const res = await API.get("/products/admin/my", { params });
+    // view: "mine" | "available" | "all", warehouseId: optional
+    const res = await API.get("/products/admin/catalogue", { params });
     return { ok: true, data: res.data };
   } catch (error) {
     return {
@@ -888,14 +964,18 @@ export async function updateProduct(id, formData) {
     return {
       ok: false,
       message: error.response?.data?.message || "Failed to update product",
+      code: error.response?.data?.code || null,
+      data: error.response?.data,
     };
   }
 }
 
 /* ================= DELETE PRODUCT (ADMIN) ================= */
-export async function deleteProduct(id) {
+export async function deleteProduct(id, { onlyMyLocations = false } = {}) {
   try {
-    const res = await API.delete(`/products/delete/${id}`);
+    const res = await API.delete(`/products/delete/${id}`, {
+      params: onlyMyLocations ? { scope: "mine" } : undefined,
+    });
     return { ok: true, data: res.data };
   } catch (error) {
     console.error(
