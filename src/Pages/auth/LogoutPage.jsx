@@ -1,5 +1,5 @@
 
-import React from "react";
+import React, { useState } from "react";
 import { useAuth } from "../../Context/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
@@ -8,12 +8,19 @@ export default function LogoutPage() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  const handleConfirm = (confirm) => {
-    if (confirm) {
-      logout();    
-      toast.error("log Out")
-    } else {
-      navigate(-1);     }
+  const [busy, setBusy] = useState(false);
+
+  const handleConfirm = async (confirm) => {
+    if (!confirm) {
+      navigate(-1);
+      return;
+    }
+
+    // logout() revokes the refresh token on the server, then clears locally
+    // and redirects to /login.
+    setBusy(true);
+    await logout();
+    toast.success("Logged out");
   };
 
   return (
@@ -24,9 +31,10 @@ export default function LogoutPage() {
       <div className="space-x-4">
         <button
           onClick={() => handleConfirm(true)}
-          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          disabled={busy}
+          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-red-300"
         >
-          Yes, Logout
+          {busy ? "Logging out..." : "Yes, Logout"}
         </button>
         <button
           onClick={() => handleConfirm(false)}

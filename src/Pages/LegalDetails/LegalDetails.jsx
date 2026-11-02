@@ -122,7 +122,7 @@ export default function LegalDetails() {
     for (const [label, value] of [
       ["Product GST rate", Number(form.taxConfig.productGstRate)],
       ["Delivery GST rate", Number(form.taxConfig.deliveryGstRate)],
-      ["Platform fee GST rate", Number(form.taxConfig.platformFeeGstRate)],
+      ["Handling fee GST rate", Number(form.taxConfig.platformFeeGstRate)],
     ]) {
       if (Number.isNaN(value) || value < 0 || value > 100) {
         return `${label} must be between 0 and 100`;
@@ -157,7 +157,7 @@ export default function LegalDetails() {
       pincode: form.pincode.trim(),
       invoicePrefix: normalizeUpper(form.invoicePrefix || "HNG").replace(
         /[^A-Z0-9/-]/g,
-        ""
+        "",
       ),
       placeOfSupply: form.placeOfSupply.trim(),
       taxConfig: {
@@ -213,7 +213,8 @@ export default function LegalDetails() {
               </p>
               <h1 className="mt-2 text-3xl font-semibold">Legal Details</h1>
               <p className="mt-2 max-w-3xl text-sm text-slate-200">
-                Save the seller details required on GST-compliant invoices generated for users and restaurant owners.
+                Save the seller details required on GST-compliant invoices
+                generated for users and restaurant owners.
               </p>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-medium text-cyan-50">
@@ -223,12 +224,17 @@ export default function LegalDetails() {
           </div>
         </section>
 
-        <form onSubmit={handleSubmit} className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]">
+        <form
+          onSubmit={handleSubmit}
+          className="grid gap-6 lg:grid-cols-[1.3fr_0.7fr]"
+        >
           <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
             <div className="flex items-center gap-3">
               <Landmark className="h-5 w-5 text-emerald-600" />
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Seller Identity</h2>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Seller Identity
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   These details identify the billing entity on invoices.
                 </p>
@@ -253,7 +259,9 @@ export default function LegalDetails() {
                 Trade name
                 <input
                   value={form.tradeName}
-                  onChange={(event) => updateField("tradeName", event.target.value)}
+                  onChange={(event) =>
+                    updateField("tradeName", event.target.value)
+                  }
                   className={fieldClassName}
                   placeholder="Hungzo"
                   disabled={loading || saving}
@@ -293,7 +301,10 @@ export default function LegalDetails() {
                 <input
                   value={form.sellerCode}
                   onChange={(event) =>
-                    updateField("sellerCode", normalizeUpper(event.target.value))
+                    updateField(
+                      "sellerCode",
+                      normalizeUpper(event.target.value),
+                    )
                   }
                   className={fieldClassName}
                   placeholder="BCPL-UP-NCR"
@@ -333,7 +344,10 @@ export default function LegalDetails() {
                 <input
                   value={form.invoicePrefix}
                   onChange={(event) =>
-                    updateField("invoicePrefix", normalizeUpper(event.target.value))
+                    updateField(
+                      "invoicePrefix",
+                      normalizeUpper(event.target.value),
+                    )
                   }
                   className={fieldClassName}
                   placeholder="HNG"
@@ -375,7 +389,7 @@ export default function LegalDetails() {
                   onChange={(event) =>
                     updateField(
                       "authorizedSignatoryDesignation",
-                      event.target.value
+                      event.target.value,
                     )
                   }
                   className={fieldClassName}
@@ -401,7 +415,9 @@ export default function LegalDetails() {
             <div className="mt-8 flex items-center gap-3">
               <MapPin className="h-5 w-5 text-cyan-600" />
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Registered Address</h2>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Registered Address
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
                   This appears as the seller address on invoices.
                 </p>
@@ -462,7 +478,10 @@ export default function LegalDetails() {
                 <input
                   value={form.pincode}
                   onChange={(event) =>
-                    updateField("pincode", event.target.value.replace(/\D/g, ""))
+                    updateField(
+                      "pincode",
+                      event.target.value.replace(/\D/g, ""),
+                    )
                   }
                   className={fieldClassName}
                   placeholder="492001"
@@ -475,9 +494,12 @@ export default function LegalDetails() {
             <div className="mt-8 flex items-center gap-3">
               <Landmark className="h-5 w-5 text-amber-600" />
               <div>
-                <h2 className="text-xl font-semibold text-slate-900">Tax Configuration</h2>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Tax Configuration
+                </h2>
                 <p className="mt-1 text-sm text-slate-500">
-                  Default GST rates used to compute invoice tax breakup for orders.
+                  Default GST rates used to compute invoice tax breakup for
+                  orders.
                 </p>
               </div>
             </div>
@@ -516,7 +538,7 @@ export default function LegalDetails() {
               </label>
 
               <label className="text-sm font-medium text-slate-700">
-                Platform fee GST rate (%)
+                Handling fee GST rate (%)
                 <input
                   type="number"
                   min="0"
@@ -551,7 +573,9 @@ export default function LegalDetails() {
               <div className="flex items-center gap-3">
                 <Mail className="h-5 w-5 text-violet-600" />
                 <div>
-                  <h2 className="text-xl font-semibold text-slate-900">Support Contact</h2>
+                  <h2 className="text-xl font-semibold text-slate-900">
+                    Support Contact
+                  </h2>
                   <p className="mt-1 text-sm text-slate-500">
                     Invoice footer support details for users.
                   </p>
@@ -589,7 +613,9 @@ export default function LegalDetails() {
             </div>
 
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
-              <h2 className="text-xl font-semibold text-slate-900">What this powers</h2>
+              <h2 className="text-xl font-semibold text-slate-900">
+                What this powers
+              </h2>
               <ul className="mt-4 space-y-3 text-sm text-slate-600">
                 <li className="flex gap-3">
                   <FileText className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />

@@ -2,10 +2,17 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import bgImage from "../../assets/Store.png";
 import logo from "../../assets/Logo.png";
-import {UserIcon,LockClosedIcon,EyeIcon,EyeSlashIcon,} from "@heroicons/react/24/outline";
+import {
+  UserIcon,
+  LockClosedIcon,
+  EyeIcon,
+  EyeSlashIcon,
+} from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 import { useAuth } from "../../Context/AuthProvider";
 import { motion } from "framer-motion";
+import { firstAllowedRoute } from "../../Config/navigation";
+import { hasPermission } from "../../Config/permissions";
 
 const formVariants = {
   hidden: { opacity: 0 },
@@ -27,12 +34,23 @@ const getStrength = (password) => {
 };
 
 export default function Login() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, isAuthenticated, permissions } = useAuth();
   const navigate = useNavigate();
 
+  // Land on the first screen this role can actually open, so a role without
+  // dashboard access never starts on a "no access" page.
+  // Pass permissions explicitly: right after login() the `permissions` in this
+  // render are still the old empty array (stale closure), which made
+  // firstAllowedRoute() return null and left the admin stuck on /login.
+  const landingRoute = (perms = permissions) =>
+    firstAllowedRoute(perms, hasPermission);
+
   useEffect(() => {
-    if (isAuthenticated) navigate("/", { replace: true });
-  }, [isAuthenticated, navigate]);
+    if (!isAuthenticated || !permissions.length) return;
+    const route = landingRoute(permissions);
+    if (route) navigate(route, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, permissions, navigate]);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -54,23 +72,32 @@ export default function Login() {
 
   const strength = getStrength(password);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  if (!username || !password) {
-    toast.error("Username & Password required");
-    return;
-  }
+    if (!username || !password) {
+      toast.error("Username & Password required");
+      return;
+    }
 
-  const res = await login({ username, password });
+    const res = await login({ username, password });
 
-  if (res.ok) {
-    toast.success("Login Successful!");
-    navigate("/", { replace: true });
-  } else {
-    toast.error(res.message);
-  }
-};
+    if (res.ok) {
+      toast.success("Login Successful!");
+      // Land on the first screen this role can actually open, so a role that
+      // cannot see the dashboard never starts on a "no access" page.
+      const route = landingRoute(res.permissions);
+      if (route) {
+        navigate(route, { replace: true });
+      } else {
+        toast.error(
+          "Your account has no screens assigned. Contact a super admin.",
+        );
+      }
+    } else {
+      toast.error(res.message);
+    }
+  };
 
   return (
     <motion.div

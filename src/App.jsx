@@ -2,9 +2,11 @@ import React from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { Toaster } from "react-hot-toast";
 import ProtectedRoute from "./Components/ProtectedRoute";
+import { PERMISSIONS } from "./Config/permissions";
 import LogoutPage from "./Pages/auth/LogoutPage";
 import NotFound from "./Pages/auth/NotFound";
 import OrdersPage from "./Pages/Orders/OrdersPage";
+import Dashboard from "./Pages/Dashboard/Dashboard";
 import Sidebar from "./Components/Sidebar";
 import Login from "./Pages/auth/Login";
 import Verifications from "./Pages/verification/Verifications";
@@ -33,6 +35,14 @@ import BuyerGST from "./Pages/BuyerGST/BuyerGST";
 import DeletionRequests from "./Pages/Users/DeletionRequests";
 import AppConfiguration from "./Pages/AppConfiguration/AppConfiguration";
 import Policies from "./Pages/Policies/Policies";
+import CitiesStates from "./Pages/Locations/CitiesStates";
+import Zones from "./Pages/Locations/Zones";
+import WarehouseSettings from "./Pages/Locations/WarehouseSettings";
+import ServiceabilityCheck from "./Pages/Locations/ServiceabilityCheck";
+import Waitlist from "./Pages/Locations/Waitlist";
+import InventoryGrid from "./Pages/Inventory/InventoryGrid";
+import AdminScope from "./Pages/Admin/AdminScope";
+import CityOrders from "./Pages/Orders/CityOrders";
 
 export default function App() {
   const location = useLocation();
@@ -60,7 +70,15 @@ export default function App() {
               path="/"
               element={
                 <ProtectedRoute>
-                  <OrdersPage />
+                  <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <Dashboard />
                 </ProtectedRoute>
               }
             />
@@ -73,7 +91,15 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/wallet/:userId" element={<RestaurantsWallet />} />
+            {/* was unprotected: reachable without logging in */}
+            <Route
+              path="/wallet/:userId"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.CUSTOMERS.MANAGE_WALLET}>
+                  <RestaurantsWallet />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/orders"
               element={
@@ -85,7 +111,7 @@ export default function App() {
             <Route
               path="/orders/user/:userId"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute permission={PERMISSIONS.ORDERS.VIEW}>
                   <UserOrders />
                 </ProtectedRoute>
               }
@@ -250,6 +276,72 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            {/* ---------------- Multi-city ---------------- */}
+            <Route
+              path="/locations/cities"
+              element={
+                <ProtectedRoute>
+                  <CitiesStates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/locations/zones"
+              element={
+                <ProtectedRoute>
+                  <Zones />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/locations/warehouses"
+              element={
+                <ProtectedRoute>
+                  <WarehouseSettings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/locations/serviceability"
+              element={
+                <ProtectedRoute>
+                  <ServiceabilityCheck />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/locations/waitlist"
+              element={
+                <ProtectedRoute>
+                  <Waitlist />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/orders/cities"
+              element={
+                <ProtectedRoute>
+                  <CityOrders />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/inventory"
+              element={
+                <ProtectedRoute>
+                  <InventoryGrid />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/scope"
+              element={
+                <ProtectedRoute>
+                  <AdminScope />
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="/policies"
               element={
@@ -274,7 +366,15 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-            <Route path="/driver-orders/:driverId" element={<DriverOrder />} />
+            {/* was unprotected: reachable without logging in */}
+            <Route
+              path="/driver-orders/:driverId"
+              element={
+                <ProtectedRoute permission={PERMISSIONS.DRIVERS.VIEW}>
+                  <DriverOrder />
+                </ProtectedRoute>
+              }
+            />
             {/* 404 */}
             <Route path="*" element={<NotFound />} />
           </Routes>

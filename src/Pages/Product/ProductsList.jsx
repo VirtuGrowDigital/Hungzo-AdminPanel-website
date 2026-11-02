@@ -25,10 +25,34 @@ import {
   fetchProductReviewsAdmin,
   updateProductReviewStatus,
   fetchSubCategories,
-  exportProducts
+  exportProducts,
 } from "../../Api";
 import { PUBLIC_PRODUCT_DEFAULT_IMAGE_URL } from "../../utils/publicAssets";
 import ProductSectionTabs from "./ProductSectionTabs";
+import ProductLocationsModal from "./ProductLocationsModal";
+import { useAuth } from "../../Context/AuthProvider";
+import { useLocations } from "../../Context/LocationProvider";
+import { PERMISSIONS as P } from "../../Config/permissions";
+import { Lock, MapPin, PlusCircle, Store } from "lucide-react";
+
+// Which slice of the catalogue to show.
+const VIEW_OPTIONS = [
+  {
+    value: "mine",
+    label: "Sold in my locations",
+    hint: "Products your warehouses sell, with your stock and prices.",
+  },
+  {
+    value: "available",
+    label: "Add from catalogue",
+    hint: "Products other locations already sell. Add them to yours instead of creating duplicates.",
+  },
+  {
+    value: "all",
+    label: "Whole catalogue",
+    hint: "Every product in the catalogue.",
+  },
+];
 
 const createVarietyId = () =>
   `variety-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -46,30 +70,30 @@ const formatCurrency = (value) => {
   const numericValue = Number(value);
   return Number.isFinite(numericValue)
     ? new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency: "INR",
-      maximumFractionDigits: 0,
-    }).format(numericValue)
+        style: "currency",
+        currency: "INR",
+        maximumFractionDigits: 0,
+      }).format(numericValue)
     : "—";
 };
 const getProductCategoryId = (product = {}) =>
   typeof product.category === "object"
-    ? product.category?._id ?? ""
-    : product.category?.toString() ?? "";
+    ? (product.category?._id ?? "")
+    : (product.category?.toString() ?? "");
 const getProductCategoryName = (product = {}, categoryNameById = {}) =>
   typeof product.category === "object"
-    ? product.category?.name ?? "—"
-    : categoryNameById[product.category] ?? "—";
+    ? (product.category?.name ?? "—")
+    : (categoryNameById[product.category] ?? "—");
 
 const getProductSubCategoryId = (product = {}) =>
   typeof product.subcategory === "object"
-    ? product.subcategory?._id ?? ""
-    : product.subcategory?.toString() ?? "";
+    ? (product.subcategory?._id ?? "")
+    : (product.subcategory?.toString() ?? "");
 
 const getSubCategoryParentId = (subCategory = {}) =>
   typeof subCategory.category === "object"
-    ? subCategory.category?._id ?? ""
-    : subCategory.category?.toString() ?? "";
+    ? (subCategory.category?._id ?? "")
+    : (subCategory.category?.toString() ?? "");
 const getProductsFromResponse = (payload) => {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.products)) return payload.products;
@@ -94,33 +118,40 @@ const extractImageUrl = (value) => {
   }
 
   if (typeof value === "object") {
-    return [
-      value.url,
-      value.location,
-      value.src,
-      value.href,
-      value.secure_url,
-      value.imageUrl,
-      value.image,
-      value.primaryImage,
-    ]
-      .map(extractImageUrl)
-      .find(Boolean) ?? "";
+    return (
+      [
+        value.url,
+        value.location,
+        value.src,
+        value.href,
+        value.secure_url,
+        value.imageUrl,
+        value.image,
+        value.primaryImage,
+      ]
+        .map(extractImageUrl)
+        .find(Boolean) ?? ""
+    );
   }
 
   return "";
 };
 const getProductPrimaryImage = (product = {}) => {
   const primaryImage = extractImageUrl(product.primaryImage);
-  if (primaryImage && primaryImage !== LEGACY_PRODUCT_IMAGE_URL) return primaryImage;
+  if (primaryImage && primaryImage !== LEGACY_PRODUCT_IMAGE_URL)
+    return primaryImage;
 
-  return toSafeArray(product.images)
-    .map(extractImageUrl)
-    .filter((image) => image !== LEGACY_PRODUCT_IMAGE_URL)
-    .find(Boolean) ?? DEFAULT_PRODUCT_IMAGE_URL;
+  return (
+    toSafeArray(product.images)
+      .map(extractImageUrl)
+      .filter((image) => image !== LEGACY_PRODUCT_IMAGE_URL)
+      .find(Boolean) ?? DEFAULT_PRODUCT_IMAGE_URL
+  );
 };
 const getAvailableVarieties = (product = {}) =>
-  toSafeArray(product.varieties).filter((variety) => variety?.isAvailable !== false);
+  toSafeArray(product.varieties).filter(
+    (variety) => variety?.isAvailable !== false,
+  );
 const getPriceSummary = (product = {}) => {
   const startingPrice = Number(product.startingPrice);
   const originalPrice = Number(product.originalPrice);
@@ -141,6 +172,15 @@ const getNumericStock = (stockQuantity) => {
 const getInventoryHealth = (product = {}) => {
   const stock = getNumericStock(product.stockQuantity);
   const unavailable = product.status !== "available";
+
+  if (product.listing && !product.listing.listed) {
+    return {
+      key: "unlisted",
+      label: "Not sold in your locations",
+      tone: "bg-slate-100 text-slate-600",
+      border: "border-slate-200",
+    };
+  }
 
   if (stock <= 0) {
     return {
@@ -252,7 +292,10 @@ const getEditableProductImages = (product = {}, selectedImages = []) => {
       !isDefaultProductImage(primaryImage) &&
       realImages.includes(primaryImage)
     ) {
-      return [primaryImage, ...realImages.filter((image) => image !== primaryImage)];
+      return [
+        primaryImage,
+        ...realImages.filter((image) => image !== primaryImage),
+      ];
     }
 
     return realImages;
@@ -266,8 +309,9 @@ const getEditableProductImages = (product = {}, selectedImages = []) => {
 };
 
 const getEditableImageCount = (product = {}, selectedImages = []) =>
-  normalizeProductImages(product).filter((image) => !isDefaultProductImage(image)).length +
-  selectedImages.length;
+  normalizeProductImages(product).filter(
+    (image) => !isDefaultProductImage(image),
+  ).length + selectedImages.length;
 
 const normalizeProductForEdit = (product) => ({
   ...product,
@@ -288,7 +332,7 @@ const normalizeProductForEdit = (product) => ({
   shelfLifeDays: String(product.shelfLifeDays ?? 0),
   storageType: product.storageType ?? "ambient",
   seedRatingAverage: String(
-    product.seedRatingAverage ?? product.ratingAverage ?? product.rating ?? 0
+    product.seedRatingAverage ?? product.ratingAverage ?? product.rating ?? 0,
   ),
   seedRatingCount: String(product.seedRatingCount ?? product.ratingCount ?? 0),
   purchaseCount: String(product.purchaseCount ?? 0),
@@ -304,7 +348,18 @@ const normalizeProductForEdit = (product) => ({
 
 const inputClass =
   "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100";
-const unitOptions = ["kg", "g", "l", "ml", "pcs", "packs", "boxes", "jars", "bottles", "cans"];
+const unitOptions = [
+  "kg",
+  "g",
+  "l",
+  "ml",
+  "pcs",
+  "packs",
+  "boxes",
+  "jars",
+  "bottles",
+  "cans",
+];
 const storageOptions = [
   { value: "ambient", label: "Ambient" },
   { value: "dry", label: "Dry storage" },
@@ -314,6 +369,11 @@ const storageOptions = [
 const INVENTORY_PAGE_SIZE = 10;
 
 export default function ProductsList() {
+  const { can, isSuperAdmin } = useAuth();
+  const { warehouses } = useLocations();
+  const [view, setView] = useState(isSuperAdmin ? "all" : "mine");
+  const [warehouseFilter, setWarehouseFilter] = useState("");
+  const [locationsProductId, setLocationsProductId] = useState(null);
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [subCategories, setSubCategories] = useState([]);
@@ -369,6 +429,8 @@ export default function ProductsList() {
 
   useEffect(() => {
     const filterKey = JSON.stringify({
+      view,
+      warehouseFilter,
       search,
       categoryFilter,
       subCategoryFilter,
@@ -389,7 +451,18 @@ export default function ProductsList() {
 
     previousFilterKeyRef.current = filterKey;
     loadProducts();
-  }, [currentPage, search, categoryFilter, subCategoryFilter, stockFilter, merchandisingFilter, sortBy]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    currentPage,
+    view,
+    warehouseFilter,
+    search,
+    categoryFilter,
+    subCategoryFilter,
+    stockFilter,
+    merchandisingFilter,
+    sortBy,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -419,6 +492,8 @@ export default function ProductsList() {
     setProductsLoading(true);
     setProductsError("");
     const res = await myProducts({
+      view,
+      ...(warehouseFilter ? { warehouseId: warehouseFilter } : {}),
       page: currentPage,
       limit: INVENTORY_PAGE_SIZE,
       search,
@@ -438,7 +513,7 @@ export default function ProductsList() {
           totalPages: 1,
           hasPrev: false,
           hasNext: false,
-        }
+        },
       );
       setProductStats(
         res.data?.summary || {
@@ -449,14 +524,14 @@ export default function ProductsList() {
           outOfStock: 0,
           hidden: 0,
           unitsOnHand: 0,
-        }
+        },
       );
       setInventoryPanels(
         res.data?.panels || {
           attentionItems: [],
           hiddenItems: [],
           topMovers: [],
-        }
+        },
       );
       setProductsLoading(false);
       return;
@@ -481,7 +556,7 @@ export default function ProductsList() {
         accumulator[category._id] = category.name;
         return accumulator;
       }, {}),
-    [categories]
+    [categories],
   );
 
   const filterSubCategories = useMemo(
@@ -489,19 +564,19 @@ export default function ProductsList() {
       categoryFilter === "all"
         ? subCategories
         : subCategories.filter(
-          (sub) => getSubCategoryParentId(sub) === categoryFilter
-        ),
-    [subCategories, categoryFilter]
+            (sub) => getSubCategoryParentId(sub) === categoryFilter,
+          ),
+    [subCategories, categoryFilter],
   );
 
   const editSubCategories = useMemo(
     () =>
       editingProduct?.category
         ? subCategories.filter(
-          (sub) => getSubCategoryParentId(sub) === editingProduct.category
-        )
+            (sub) => getSubCategoryParentId(sub) === editingProduct.category,
+          )
         : [],
-    [subCategories, editingProduct?.category]
+    [subCategories, editingProduct?.category],
   );
 
   useEffect(() => {
@@ -515,7 +590,7 @@ export default function ProductsList() {
     const maxButtons = 4;
     const start = Math.max(
       1,
-      Math.min(currentPage - 1, totalPages - maxButtons + 1)
+      Math.min(currentPage - 1, totalPages - maxButtons + 1),
     );
     const end = Math.min(totalPages, start + maxButtons - 1);
 
@@ -541,22 +616,42 @@ export default function ProductsList() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this product permanently?")) return;
+  const handleDelete = async (product) => {
+    const access = product.access || {};
+    const everywhere = access.canDeleteEverywhere;
+    const question = everywhere
+      ? access.isShared ||
+        (product.listing?.totalLocations || 0) >
+          (product.listing?.warehouseCount || 0)
+        ? `Delete "${product.name}" from the catalogue and EVERY location that sells it? This cannot be undone.`
+        : `Delete "${product.name}" permanently? It is only sold in your location(s).`
+      : `Remove "${product.name}" from your location(s)? Other locations that sell it are not affected.`;
+    if (!window.confirm(question)) return;
 
     try {
-      const res = await deleteProduct(id);
+      const res = await deleteProduct(product._id);
       if (!res?.ok) {
         throw new Error(res?.message || "Delete failed");
       }
       await loadProducts();
-      toast.success("Product deleted permanently");
+      toast.success(res.data?.message || "Done");
     } catch (error) {
       toast.error(error.message || "Delete failed");
     }
   };
 
   const handleEdit = (product) => {
+    if (product.access && !product.access.canEditMaster) {
+      toast(
+        product.access.reason ||
+          "This product is shared — set your price & stock instead.",
+        {
+          icon: "🔒",
+        },
+      );
+      setLocationsProductId(product._id);
+      return;
+    }
     setEditingProduct(normalizeProductForEdit(product));
     setImageSelectionError("");
     setSelectedImages((prev) => {
@@ -597,7 +692,6 @@ export default function ProductsList() {
     setReviewsLoading(false);
   };
 
-
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
     setEditingProduct((prev) => ({
@@ -629,23 +723,17 @@ export default function ProductsList() {
         return;
       }
 
-      const blobUrl =
-        window.URL.createObjectURL(result.blob);
+      const blobUrl = window.URL.createObjectURL(result.blob);
 
       const a = document.createElement("a");
 
       a.href = blobUrl;
 
-      const match =
-        /filename="([^"]+)"/i.exec(
-          result.contentDisposition
-        );
+      const match = /filename="([^"]+)"/i.exec(result.contentDisposition);
 
       a.download =
         match?.[1] ||
-        `products-export-${new Date()
-          .toISOString()
-          .slice(0, 10)}.csv`;
+        `products-export-${new Date().toISOString().slice(0, 10)}.csv`;
 
       document.body.appendChild(a);
       a.click();
@@ -690,9 +778,11 @@ export default function ProductsList() {
         (variety) =>
           variety.name?.trim() &&
           variety.originalPrice !== "" &&
-          variety.discountedPrice !== ""
+          variety.discountedPrice !== "",
       )
       .map((variety) => ({
+        // Keep the variety id: every location's price/stock is linked to it.
+        ...(variety._id ? { _id: variety._id } : {}),
         name: variety.name.trim(),
         originalPrice: Number(variety.originalPrice),
         discountedPrice: Number(variety.discountedPrice),
@@ -704,31 +794,34 @@ export default function ProductsList() {
     if (files.length === 0) return;
 
     const nextErrors = [];
-    const validFiles = files.filter(
-      (file) => {
-        const validType = ALLOWED_PRODUCT_IMAGE_TYPES.includes(file.type);
-        const validSize = file.size <= MAX_PRODUCT_IMAGE_SIZE_BYTES;
-        return validType && validSize;
-      }
-    );
+    const validFiles = files.filter((file) => {
+      const validType = ALLOWED_PRODUCT_IMAGE_TYPES.includes(file.type);
+      const validSize = file.size <= MAX_PRODUCT_IMAGE_SIZE_BYTES;
+      return validType && validSize;
+    });
 
     if (validFiles.length !== files.length) {
       nextErrors.push("Only JPG, PNG, or WEBP images up to 5MB are allowed.");
       toast.error("Only JPG, PNG, or WEBP images up to 5MB are allowed");
     }
 
-    const currentImageCount = getEditableImageCount(editingProduct, selectedImages);
+    const currentImageCount = getEditableImageCount(
+      editingProduct,
+      selectedImages,
+    );
     const remainingSlots = Math.max(0, MAX_PRODUCT_IMAGES - currentImageCount);
     const acceptedFiles = validFiles.slice(0, remainingSlots);
 
     if (validFiles.length > remainingSlots) {
-      nextErrors.push(`You can upload up to ${MAX_PRODUCT_IMAGES} product images.`);
+      nextErrors.push(
+        `You can upload up to ${MAX_PRODUCT_IMAGES} product images.`,
+      );
       toast.error(`You can upload up to ${MAX_PRODUCT_IMAGES} product images`);
     }
 
     const currentSelectedBytes = selectedImages.reduce(
       (total, image) => total + (image.file?.size || 0),
-      0
+      0,
     );
     let runningTotalBytes = currentSelectedBytes;
     const uploadableFiles = [];
@@ -753,7 +846,7 @@ export default function ProductsList() {
         setEditingProduct((currentProduct) =>
           currentProduct
             ? { ...currentProduct, primaryImage: combinedImages[0].id }
-            : currentProduct
+            : currentProduct,
         );
       }
       return combinedImages;
@@ -788,13 +881,13 @@ export default function ProductsList() {
       setEditingProduct((currentProduct) =>
         currentProduct
           ? {
-            ...currentProduct,
-            primaryImage:
-              currentProduct.primaryImage === imageId
-                ? currentProduct.images[0] || nextImages[0]?.id || ""
-                : currentProduct.primaryImage,
-          }
-          : currentProduct
+              ...currentProduct,
+              primaryImage:
+                currentProduct.primaryImage === imageId
+                  ? currentProduct.images[0] || nextImages[0]?.id || ""
+                  : currentProduct.primaryImage,
+            }
+          : currentProduct,
       );
       return nextImages;
     });
@@ -805,10 +898,10 @@ export default function ProductsList() {
     setEditingProduct((prev) =>
       prev
         ? {
-          ...prev,
-          images: moveItem(prev.images, index, index + direction),
-        }
-        : prev
+            ...prev,
+            images: moveItem(prev.images, index, index + direction),
+          }
+        : prev,
     );
   };
 
@@ -818,17 +911,17 @@ export default function ProductsList() {
 
   const editableExistingImages = useMemo(
     () => getEditableProductImages(editingProduct || {}, selectedImages),
-    [editingProduct, selectedImages]
+    [editingProduct, selectedImages],
   );
 
   const setPrimaryImage = (imageReference) => {
     setEditingProduct((prev) =>
       prev
         ? {
-          ...prev,
-          primaryImage: imageReference,
-        }
-        : prev
+            ...prev,
+            primaryImage: imageReference,
+          }
+        : prev,
     );
   };
 
@@ -852,7 +945,7 @@ export default function ProductsList() {
       (variety) =>
         variety.originalPrice <= 0 ||
         variety.discountedPrice <= 0 ||
-        variety.discountedPrice > variety.originalPrice
+        variety.discountedPrice > variety.originalPrice,
     );
     if (invalidVariety) {
       return `Check prices for ${invalidVariety.name}. Discounted price must be positive and not exceed original price.`;
@@ -921,42 +1014,42 @@ export default function ProductsList() {
       formData.append("category", editingProduct.category);
       formData.append("subcategory", editingProduct.subcategory);
       formData.append("unit", editingProduct.unit || "pcs");
-      formData.append("packSizeLabel", editingProduct.packSizeLabel?.trim() || "");
+      formData.append(
+        "packSizeLabel",
+        editingProduct.packSizeLabel?.trim() || "",
+      );
       formData.append("status", editingProduct.status);
       formData.append("stock", editingProduct.stock?.trim() || "");
-      formData.append(
-        "stockQuantity",
-        String(Number(editingProduct.stockQuantity) || 0)
-      );
+      // Stock is per location now (Price & stock), not on the product.
       formData.append(
         "minOrderQuantity",
-        String(Math.max(1, Number(editingProduct.minOrderQuantity) || 1))
+        String(Math.max(1, Number(editingProduct.minOrderQuantity) || 1)),
       );
       formData.append(
         "shelfLifeDays",
-        String(Number(editingProduct.shelfLifeDays) || 0)
+        String(Number(editingProduct.shelfLifeDays) || 0),
       );
       formData.append("storageType", editingProduct.storageType || "ambient");
       formData.append("isFeatured", String(Boolean(editingProduct.isFeatured)));
       formData.append(
         "isBestseller",
-        String(Boolean(editingProduct.isBestseller))
+        String(Boolean(editingProduct.isBestseller)),
       );
       formData.append(
         "seedRatingAverage",
-        String(Number(editingProduct.seedRatingAverage) || 0)
+        String(Number(editingProduct.seedRatingAverage) || 0),
       );
       formData.append(
         "seedRatingCount",
-        String(Number(editingProduct.seedRatingCount) || 0)
+        String(Number(editingProduct.seedRatingCount) || 0),
       );
       formData.append(
         "purchaseCount",
-        String(Number(editingProduct.purchaseCount) || 0)
+        String(Number(editingProduct.purchaseCount) || 0),
       );
       formData.append(
         "displayOrder",
-        String(Number(editingProduct.displayOrder) || 0)
+        String(Number(editingProduct.displayOrder) || 0),
       );
       formData.append(
         "badges",
@@ -965,16 +1058,13 @@ export default function ProductsList() {
             .split(",")
             .map((badge) => badge.trim())
             .filter(Boolean)
-            .slice(0, 6)
-        )
+            .slice(0, 6),
+        ),
       );
 
       const validVarieties = getValidVarieties(editingProduct.varieties);
       formData.append("varieties", JSON.stringify(validVarieties));
-      formData.append(
-        "retainImages",
-        JSON.stringify(editableExistingImages)
-      );
+      formData.append("retainImages", JSON.stringify(editableExistingImages));
 
       const imageOrder = [
         ...editableExistingImages,
@@ -984,13 +1074,13 @@ export default function ProductsList() {
 
       if (editingProduct.primaryImage) {
         const selectedImageIndex = selectedImages.findIndex(
-          (image) => image.id === editingProduct.primaryImage
+          (image) => image.id === editingProduct.primaryImage,
         );
         formData.append(
           "primaryImage",
           selectedImageIndex >= 0
             ? getUploadReference(selectedImageIndex)
-            : editingProduct.primaryImage
+            : editingProduct.primaryImage,
         );
       }
 
@@ -1038,8 +1128,8 @@ export default function ProductsList() {
 
       setProductReviews((prev) =>
         prev.map((review) =>
-          review._id === reviewId ? response.data?.review ?? review : review
-        )
+          review._id === reviewId ? (response.data?.review ?? review) : review,
+        ),
       );
 
       if (editingProduct?._id) {
@@ -1059,8 +1149,9 @@ export default function ProductsList() {
         <div className="mb-5 flex flex-col gap-2">
           <h1 className="text-3xl font-bold text-slate-900">Inventory Panel</h1>
           <p className="max-w-4xl text-sm text-slate-600">
-            Track stock health, review catalog readiness, surface products that need action,
-            and update wholesale inventory from one operations-first workspace.
+            Track stock health, review catalog readiness, surface products that
+            need action, and update wholesale inventory from one
+            operations-first workspace.
           </p>
         </div>
 
@@ -1077,8 +1168,9 @@ export default function ProductsList() {
                 Monitor live stock, assortment health, and product visibility.
               </h2>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
-                Use filters to isolate stock risks, then edit products, hide unavailable listings,
-                or jump into product creation and category maintenance.
+                Use filters to isolate stock risks, then edit products, hide
+                unavailable listings, or jump into product creation and category
+                maintenance.
               </p>
             </div>
 
@@ -1109,12 +1201,61 @@ export default function ProductsList() {
           </div>
         </section>
 
+        <section className="mb-5 flex flex-col gap-3 rounded-3xl bg-white p-3 shadow-sm ring-1 ring-slate-200 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2">
+            {VIEW_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                title={option.hint}
+                onClick={() => setView(option.value)}
+                className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${
+                  view === option.value
+                    ? "bg-emerald-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <Store className="h-4 w-4 text-slate-400" />
+            <select
+              value={warehouseFilter}
+              onChange={(e) => setWarehouseFilter(e.target.value)}
+              className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            >
+              <option value="">
+                {isSuperAdmin ? "All locations" : "All my locations"}
+              </option>
+              {warehouses.map((warehouse) => (
+                <option key={warehouse._id} value={warehouse._id}>
+                  {warehouse.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </section>
+        <p className="-mt-3 mb-4 px-2 text-xs text-slate-500">
+          {VIEW_OPTIONS.find((option) => option.value === view)?.hint} Stock and
+          prices shown are for{" "}
+          {warehouseFilter
+            ? "the selected location"
+            : isSuperAdmin
+              ? "all locations"
+              : "your locations"}
+          .
+        </p>
+
         <section className="mb-5 grid gap-4 md:grid-cols-2 xl:grid-cols-6">
           <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
               Total SKUs
             </div>
-            <div className="mt-2 text-2xl font-bold text-slate-900">{productStats.total}</div>
+            <div className="mt-2 text-2xl font-bold text-slate-900">
+              {productStats.total}
+            </div>
           </div>
           <div className="rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
             <div className="text-xs font-semibold uppercase tracking-wide text-slate-400">
@@ -1161,7 +1302,9 @@ export default function ProductsList() {
         <section className="mb-5 rounded-3xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
           <div className="mb-4 flex items-center gap-2">
             <AdjustmentsHorizontalIcon className="h-5 w-5 text-slate-500" />
-            <h3 className="text-base font-semibold text-slate-900">Inventory filters</h3>
+            <h3 className="text-base font-semibold text-slate-900">
+              Inventory filters
+            </h3>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-[minmax(0,1.3fr),repeat(4,minmax(0,1fr))]">
@@ -1244,10 +1387,13 @@ export default function ProductsList() {
           <div className="overflow-hidden rounded-3xl bg-white shadow-sm ring-1 ring-slate-200">
             <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
               <div>
-                <h3 className="text-lg font-semibold text-slate-900">Inventory catalog</h3>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Inventory catalog
+                </h3>
                 <p className="text-sm text-slate-500">
                   {filteredProducts.length} matching product
-                  {filteredProducts.length === 1 ? "" : "s"} across your live catalog.
+                  {filteredProducts.length === 1 ? "" : "s"} across your live
+                  catalog.
                 </p>
               </div>
               <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
@@ -1271,7 +1417,10 @@ export default function ProductsList() {
                 <tbody>
                   {productsLoading && (
                     <tr>
-                      <td colSpan="7" className="px-4 py-16 text-center text-sm text-slate-500">
+                      <td
+                        colSpan="7"
+                        className="px-4 py-16 text-center text-sm text-slate-500"
+                      >
                         Loading inventory...
                       </td>
                     </tr>
@@ -1279,7 +1428,10 @@ export default function ProductsList() {
 
                   {!productsLoading && productsError && (
                     <tr>
-                      <td colSpan="7" className="px-4 py-16 text-center text-sm text-rose-500">
+                      <td
+                        colSpan="7"
+                        className="px-4 py-16 text-center text-sm text-rose-500"
+                      >
                         {productsError}
                       </td>
                     </tr>
@@ -1288,12 +1440,17 @@ export default function ProductsList() {
                   {!productsLoading &&
                     !productsError &&
                     filteredProducts.map((product) => {
-                      const categoryName = getProductCategoryName(product, categoryNameById);
+                      const categoryName = getProductCategoryName(
+                        product,
+                        categoryNameById,
+                      );
                       const primaryImage = getProductPrimaryImage(product);
                       const availableVarieties = getAvailableVarieties(product);
                       const priceSummary = getPriceSummary(product);
                       const varietyCount =
-                        product.availableVarietyCount ?? availableVarieties.length ?? 0;
+                        product.availableVarietyCount ??
+                        availableVarieties.length ??
+                        0;
                       const topVarietyNames = availableVarieties
                         .slice(0, 2)
                         .map((variety) => variety.name)
@@ -1313,7 +1470,8 @@ export default function ProductsList() {
                                   alt={product.name}
                                   onError={(event) => {
                                     event.currentTarget.onerror = null;
-                                    event.currentTarget.src = DEFAULT_PRODUCT_IMAGE_URL;
+                                    event.currentTarget.src =
+                                      DEFAULT_PRODUCT_IMAGE_URL;
                                   }}
                                   className="h-14 w-14 rounded-2xl object-cover ring-1 ring-slate-200"
                                 />
@@ -1324,7 +1482,9 @@ export default function ProductsList() {
                               )}
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-semibold text-slate-900">{product.name}</p>
+                                  <p className="font-semibold text-slate-900">
+                                    {product.name}
+                                  </p>
                                   {product.brand && (
                                     <span className="rounded-full bg-sky-100 px-2 py-0.5 text-[11px] font-semibold text-sky-700">
                                       {product.brand}
@@ -1342,14 +1502,51 @@ export default function ProductsList() {
                                   )}
                                 </div>
                                 <p className="mt-1 line-clamp-2 max-w-md text-sm text-slate-500">
-                                  {product.description || "No description added yet."}
+                                  {product.description ||
+                                    "No description added yet."}
                                 </p>
                                 <p className="mt-1 text-xs text-slate-400">
                                   SKU: {product.sku || "—"} • Updated{" "}
                                   {product.updatedAt
-                                    ? new Date(product.updatedAt).toLocaleDateString("en-IN")
+                                    ? new Date(
+                                        product.updatedAt,
+                                      ).toLocaleDateString("en-IN")
                                     : "recently"}
                                 </p>
+                                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                                  {product.listing?.listed ? (
+                                    <span
+                                      title={(product.listing.warehouses || [])
+                                        .map((w) => w.name)
+                                        .join(", ")}
+                                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 ring-1 ring-emerald-200"
+                                    >
+                                      <MapPin className="h-3 w-3" />
+                                      {product.listing.warehouseCount === 1
+                                        ? product.listing.warehouses?.[0]
+                                            ?.name || "1 location"
+                                        : `${product.listing.warehouseCount} of your locations`}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                                      Not sold in your locations
+                                    </span>
+                                  )}
+                                  {product.access?.isShared ? (
+                                    <span
+                                      title={product.access.reason}
+                                      className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-amber-200"
+                                    >
+                                      <Lock className="h-3 w-3" />
+                                      Shared with{" "}
+                                      {product.access.outOfScopeCount} other
+                                      location
+                                      {product.access.outOfScopeCount === 1
+                                        ? ""
+                                        : "s"}
+                                    </span>
+                                  ) : null}
+                                </div>
                                 <p className="mt-1 text-xs text-slate-400">
                                   {varietyCount} active pack option
                                   {varietyCount === 1 ? "" : "s"}
@@ -1362,20 +1559,25 @@ export default function ProductsList() {
                           </td>
 
                           <td className="px-4 py-4 text-sm text-slate-700">
-                            <div className="font-medium text-slate-900">{categoryName}</div>
+                            <div className="font-medium text-slate-900">
+                              {categoryName}
+                            </div>
                             <div className="mt-2 inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
                               {(product.unit || "pcs").toUpperCase()}
                             </div>
                           </td>
 
                           <td className="px-4 py-4 text-sm text-slate-700">
-                            <div>{product.packSizeLabel || "Pack size not set"}</div>
+                            <div>
+                              {product.packSizeLabel || "Pack size not set"}
+                            </div>
                             <div className="mt-1 text-slate-400">
-                              Min order {product.minOrderQuantity ?? 1} {product.unit ?? "pcs"}
+                              Min order {product.minOrderQuantity ?? 1}{" "}
+                              {product.unit ?? "pcs"}
                             </div>
                             <div
                               className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold capitalize ${getStorageTone(
-                                product.storageType || "ambient"
+                                product.storageType || "ambient",
                               )}`}
                             >
                               {product.storageType || "ambient"}
@@ -1384,7 +1586,9 @@ export default function ProductsList() {
                               Shelf life {product.shelfLifeDays ?? 0} days
                             </div>
                             <div className="mt-1 text-xs text-slate-400">
-                              {product.stock?.trim() ? product.stock : "No stock note"}
+                              {product.stock?.trim()
+                                ? product.stock
+                                : "No stock note"}
                             </div>
                           </td>
 
@@ -1397,7 +1601,7 @@ export default function ProductsList() {
                                     : "Price not set"}
                                 </div>
                                 {priceSummary.originalPrice !== null &&
-                                  priceSummary.originalPrice >
+                                priceSummary.originalPrice >
                                   (priceSummary.startingPrice ?? 0) ? (
                                   <div className="text-xs text-slate-400 line-through">
                                     {formatCurrency(priceSummary.originalPrice)}
@@ -1406,7 +1610,9 @@ export default function ProductsList() {
                               </div>
                               <div className="inline-flex w-fit items-center gap-1 rounded-full bg-amber-50 px-3 py-1 font-semibold text-amber-700">
                                 <StarIcon className="h-4 w-4" />
-                                {Number(product.ratingAverage ?? product.rating ?? 0).toFixed(1)}
+                                {Number(
+                                  product.ratingAverage ?? product.rating ?? 0,
+                                ).toFixed(1)}
                                 <span className="text-slate-400">
                                   ({product.ratingCount ?? 0})
                                 </span>
@@ -1420,11 +1626,14 @@ export default function ProductsList() {
 
                           <td className="px-4 py-4 text-sm text-slate-700">
                             <div className="font-semibold text-slate-900">
-                              {product.stockQuantity ?? 0} {product.unit ?? "units"}
+                              {product.stockQuantity ?? 0}{" "}
+                              {product.unit ?? "units"}
                             </div>
                             <div className="mt-1 text-xs text-slate-400">
-                              {product.availableVarietyCount ?? product.varieties?.length ?? 0} pack
-                              option
+                              {product.availableVarietyCount ??
+                                product.varieties?.length ??
+                                0}{" "}
+                              pack option
                               {(product.availableVarietyCount ??
                                 product.varieties?.length ??
                                 0) === 1
@@ -1441,54 +1650,127 @@ export default function ProductsList() {
                           <td className="px-4 py-4 text-center">
                             <select
                               value={product.status}
-                              disabled={statusLoading === product._id}
-                              onChange={(e) => updateStatus(product._id, e.target.value)}
-                              className={`rounded-full px-3 py-1.5 text-sm font-semibold text-white ${product.status === "available"
-                                ? "bg-emerald-600"
-                                : "bg-rose-600"
-                                }`}
+                              title={
+                                product.access?.canEditMaster === false
+                                  ? "Hides the product everywhere — only a Super Admin can change this for a shared product. Use Price & stock to switch it off in your location."
+                                  : "Hide or show this product for every location"
+                              }
+                              disabled={
+                                statusLoading === product._id ||
+                                product.access?.canEditMaster === false ||
+                                !can(P.CATALOGUE.UPDATE)
+                              }
+                              onChange={(e) =>
+                                updateStatus(product._id, e.target.value)
+                              }
+                              className={`rounded-full px-3 py-1.5 text-sm font-semibold text-white ${
+                                product.status === "available"
+                                  ? "bg-emerald-600"
+                                  : "bg-rose-600"
+                              }`}
                             >
                               <option value="available">Available</option>
-                              <option value="not available">Not available</option>
+                              <option value="not available">
+                                Not available
+                              </option>
                             </select>
                           </td>
 
                           <td className="px-4 py-4">
-                            <div className="flex justify-end gap-3">
-                              <button onClick={() => handleEdit(product)} title="Edit product">
-                                <PencilIcon className="h-5 w-5 text-blue-600" />
-                              </button>
-                              <button onClick={() => handleDelete(product._id)} title="Delete product">
-                                <TrashIcon className="h-5 w-5 text-rose-600" />
-                              </button>
+                            <div className="flex flex-col items-end gap-2">
+                              {can(P.INVENTORY.VIEW) ? (
+                                product.listing?.listed ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setLocationsProductId(product._id)
+                                    }
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                                  >
+                                    <MapPin className="h-3.5 w-3.5" /> Price &
+                                    stock
+                                  </button>
+                                ) : can(P.INVENTORY.UPDATE) ? (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setLocationsProductId(product._id)
+                                    }
+                                    className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
+                                  >
+                                    <PlusCircle className="h-3.5 w-3.5" /> Add
+                                    to my location
+                                  </button>
+                                ) : null
+                              ) : null}
+                              <div className="flex justify-end gap-3">
+                                {can(P.CATALOGUE.UPDATE) ? (
+                                  <button
+                                    onClick={() => handleEdit(product)}
+                                    title={
+                                      product.access?.canEditMaster === false
+                                        ? product.access.reason
+                                        : "Edit product details"
+                                    }
+                                  >
+                                    {product.access?.canEditMaster === false ? (
+                                      <Lock className="h-5 w-5 text-amber-500" />
+                                    ) : (
+                                      <PencilIcon className="h-5 w-5 text-blue-600" />
+                                    )}
+                                  </button>
+                                ) : null}
+                                {can(P.CATALOGUE.DELETE) &&
+                                (product.access?.canDeleteEverywhere ||
+                                  product.access?.canRemoveFromMyLocations) ? (
+                                  <button
+                                    onClick={() => handleDelete(product)}
+                                    title={
+                                      product.access?.canDeleteEverywhere
+                                        ? "Delete product"
+                                        : "Remove from my locations"
+                                    }
+                                  >
+                                    <TrashIcon className="h-5 w-5 text-rose-600" />
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           </td>
                         </tr>
                       );
                     })}
 
-                  {!productsLoading && !productsError && filteredProducts.length === 0 && (
-                    <tr>
-                      <td colSpan="7" className="px-4 py-16 text-center text-sm text-slate-500">
-                        No products match the current inventory filters.
-                      </td>
-                    </tr>
-                  )}
+                  {!productsLoading &&
+                    !productsError &&
+                    filteredProducts.length === 0 && (
+                      <tr>
+                        <td
+                          colSpan="7"
+                          className="px-4 py-16 text-center text-sm text-slate-500"
+                        >
+                          No products match the current inventory filters.
+                        </td>
+                      </tr>
+                    )}
                 </tbody>
               </table>
             </div>
 
             <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4 md:flex-row md:items-center md:justify-between">
               <p className="text-sm text-slate-500">
-                Showing page {pagination.page} of {pagination.totalPages} • {pagination.total} total
-                matching product{pagination.total === 1 ? "" : "s"}
+                Showing page {pagination.page} of {pagination.totalPages} •{" "}
+                {pagination.total} total matching product
+                {pagination.total === 1 ? "" : "s"}
               </p>
 
               <div className="flex items-center gap-2">
                 <button
                   type="button"
                   disabled={!pagination.hasPrev}
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() =>
+                    setCurrentPage((page) => Math.max(1, page - 1))
+                  }
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Prev
@@ -1499,10 +1781,11 @@ export default function ProductsList() {
                     key={pageNumber}
                     type="button"
                     onClick={() => setCurrentPage(pageNumber)}
-                    className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${pageNumber === pagination.page
-                      ? "bg-slate-900 text-white"
-                      : "border border-slate-200 text-slate-700 hover:bg-slate-50"
-                      }`}
+                    className={`min-w-10 rounded-xl px-3 py-2 text-sm font-semibold transition ${
+                      pageNumber === pagination.page
+                        ? "bg-slate-900 text-white"
+                        : "border border-slate-200 text-slate-700 hover:bg-slate-50"
+                    }`}
                   >
                     {pageNumber}
                   </button>
@@ -1513,7 +1796,7 @@ export default function ProductsList() {
                   disabled={!pagination.hasNext}
                   onClick={() =>
                     setCurrentPage((page) =>
-                      Math.min(pagination.totalPages || 1, page + 1)
+                      Math.min(pagination.totalPages || 1, page + 1),
                     )
                   }
                   className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1528,7 +1811,9 @@ export default function ProductsList() {
             <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center gap-2">
                 <ExclamationTriangleIcon className="h-5 w-5 text-amber-500" />
-                <h3 className="text-base font-semibold text-slate-900">Needs attention</h3>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Needs attention
+                </h3>
               </div>
               <p className="mt-1 text-sm text-slate-500">
                 Products with immediate stock risk or missing availability.
@@ -1545,7 +1830,7 @@ export default function ProductsList() {
                       <button
                         type="button"
                         key={product._id}
-                        onClick={() => handleEdit(product)}
+                        onClick={() => setLocationsProductId(product._id)}
                         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-white"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -1554,7 +1839,8 @@ export default function ProductsList() {
                               {product.name}
                             </div>
                             <div className="mt-1 text-xs text-slate-500">
-                              {product.sku || "No SKU"} • {getNumericStock(product.stockQuantity)} units
+                              {product.sku || "No SKU"} •{" "}
+                              {getNumericStock(product.stockQuantity)} units
                             </div>
                           </div>
                           <span
@@ -1573,7 +1859,9 @@ export default function ProductsList() {
             <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center gap-2">
                 <ArchiveBoxIcon className="h-5 w-5 text-slate-500" />
-                <h3 className="text-base font-semibold text-slate-900">Hidden listings</h3>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Hidden listings
+                </h3>
               </div>
               <p className="mt-1 text-sm text-slate-500">
                 Products not currently visible to buyers in the storefront.
@@ -1591,9 +1879,12 @@ export default function ProductsList() {
                       onClick={() => handleEdit(product)}
                       className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left transition hover:border-slate-300 hover:bg-white"
                     >
-                      <div className="text-sm font-semibold text-slate-900">{product.name}</div>
+                      <div className="text-sm font-semibold text-slate-900">
+                        {product.name}
+                      </div>
                       <div className="mt-1 text-xs text-slate-500">
-                        {getProductCategoryName(product, categoryNameById)} • {product.sku || "No SKU"}
+                        {getProductCategoryName(product, categoryNameById)} •{" "}
+                        {product.sku || "No SKU"}
                       </div>
                     </button>
                   ))
@@ -1604,7 +1895,9 @@ export default function ProductsList() {
             <section className="rounded-3xl bg-white p-5 shadow-sm ring-1 ring-slate-200">
               <div className="flex items-center gap-2">
                 <CheckBadgeIcon className="h-5 w-5 text-emerald-600" />
-                <h3 className="text-base font-semibold text-slate-900">Top movers</h3>
+                <h3 className="text-base font-semibold text-slate-900">
+                  Top movers
+                </h3>
               </div>
               <p className="mt-1 text-sm text-slate-500">
                 Best-selling products worth protecting from stockouts.
@@ -1623,7 +1916,8 @@ export default function ProductsList() {
                           {product.name}
                         </div>
                         <div className="mt-1 text-xs text-slate-500">
-                          Sold {product.purchaseCount ?? 0} • Stock {getNumericStock(product.stockQuantity)}
+                          Sold {product.purchaseCount ?? 0} • Stock{" "}
+                          {getNumericStock(product.stockQuantity)}
                         </div>
                       </div>
                       <span className="rounded-full bg-emerald-100 px-2 py-1 text-[11px] font-semibold text-emerald-700">
@@ -1638,15 +1932,25 @@ export default function ProductsList() {
         </div>
       </div>
 
+      <ProductLocationsModal
+        open={Boolean(locationsProductId)}
+        productId={locationsProductId}
+        onClose={() => setLocationsProductId(null)}
+        onChanged={loadProducts}
+      />
+
       {editingProduct && (
         <div className="fixed inset-0 z-50 bg-slate-950/70 p-4">
           <div className="mx-auto flex h-full max-w-5xl items-center justify-center">
             <div className="max-h-[92vh] w-full overflow-y-auto rounded-3xl bg-white p-6 shadow-2xl">
               <div className="mb-5 flex items-start justify-between gap-4">
                 <div>
-                  <h2 className="text-2xl font-semibold text-slate-900">Edit Product</h2>
+                  <h2 className="text-2xl font-semibold text-slate-900">
+                    Edit Product
+                  </h2>
                   <p className="text-sm text-slate-500">
-                    Update wholesale product details, pricing, merchandising, and inventory data.
+                    Update wholesale product details, pricing, merchandising,
+                    and inventory data.
                   </p>
                 </div>
                 <button
@@ -1657,10 +1961,15 @@ export default function ProductsList() {
                 </button>
               </div>
 
-              <form onSubmit={handleUpdate} className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+              <form
+                onSubmit={handleUpdate}
+                className="grid gap-6 xl:grid-cols-[1.5fr_1fr]"
+              >
                 <div className="space-y-6">
                   <section className="rounded-3xl border border-slate-200 p-5">
-                    <h3 className="mb-4 text-lg font-semibold text-slate-900">Core details</h3>
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                      Core details
+                    </h3>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="md:col-span-2">
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -1790,7 +2099,9 @@ export default function ProductsList() {
 
                   <section className="rounded-3xl border border-slate-200 p-5">
                     <div className="mb-4 flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-900">Pack options</h3>
+                      <h3 className="text-lg font-semibold text-slate-900">
+                        Pack options
+                      </h3>
                       <button
                         type="button"
                         onClick={addVariety}
@@ -1824,7 +2135,11 @@ export default function ProductsList() {
                               value={variety.name}
                               placeholder="Pack option"
                               onChange={(e) =>
-                                handleVarietyChange(index, "name", e.target.value)
+                                handleVarietyChange(
+                                  index,
+                                  "name",
+                                  e.target.value,
+                                )
                               }
                               className={inputClass}
                             />
@@ -1834,7 +2149,11 @@ export default function ProductsList() {
                               value={variety.originalPrice}
                               placeholder="Original price"
                               onChange={(e) =>
-                                handleVarietyChange(index, "originalPrice", e.target.value)
+                                handleVarietyChange(
+                                  index,
+                                  "originalPrice",
+                                  e.target.value,
+                                )
                               }
                               className={inputClass}
                             />
@@ -1844,7 +2163,11 @@ export default function ProductsList() {
                               value={variety.discountedPrice}
                               placeholder="Discounted price"
                               onChange={(e) =>
-                                handleVarietyChange(index, "discountedPrice", e.target.value)
+                                handleVarietyChange(
+                                  index,
+                                  "discountedPrice",
+                                  e.target.value,
+                                )
                               }
                               className={inputClass}
                             />
@@ -1853,7 +2176,11 @@ export default function ProductsList() {
                                 type="checkbox"
                                 checked={variety.isAvailable}
                                 onChange={(e) =>
-                                  handleVarietyChange(index, "isAvailable", e.target.checked)
+                                  handleVarietyChange(
+                                    index,
+                                    "isAvailable",
+                                    e.target.checked,
+                                  )
                                 }
                               />
                               Available
@@ -1867,7 +2194,9 @@ export default function ProductsList() {
 
                 <div className="space-y-6">
                   <section className="rounded-3xl border border-slate-200 p-5">
-                    <h3 className="mb-4 text-lg font-semibold text-slate-900">Supply details</h3>
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                      Supply details
+                    </h3>
                     <div className="grid gap-4 sm:grid-cols-2">
                       <div>
                         <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -1944,7 +2273,9 @@ export default function ProductsList() {
                   </section>
 
                   <section className="rounded-3xl border border-slate-200 p-5">
-                    <h3 className="mb-4 text-lg font-semibold text-slate-900">Merchandising</h3>
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                      Merchandising
+                    </h3>
                     <div className="grid gap-4">
                       <div className="grid grid-cols-2 gap-3">
                         <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
@@ -2001,8 +2332,14 @@ export default function ProductsList() {
                             Live user rating
                           </label>
                           <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-                            {Number(editingProduct.userRatingAverage ?? 0).toFixed(1)} from{" "}
-                            {editingProduct.userRatingCount ?? editingProduct.reviewCount ?? 0} reviews
+                            {Number(
+                              editingProduct.userRatingAverage ?? 0,
+                            ).toFixed(1)}{" "}
+                            from{" "}
+                            {editingProduct.userRatingCount ??
+                              editingProduct.reviewCount ??
+                              0}{" "}
+                            reviews
                           </div>
                         </div>
                         <div>
@@ -2010,8 +2347,12 @@ export default function ProductsList() {
                             Combined storefront rating
                           </label>
                           <div className="rounded-xl border border-slate-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-                            {Number(editingProduct.ratingAverage ?? editingProduct.rating ?? 0).toFixed(1)} from{" "}
-                            {editingProduct.ratingCount ?? 0} total ratings
+                            {Number(
+                              editingProduct.ratingAverage ??
+                                editingProduct.rating ??
+                                0,
+                            ).toFixed(1)}{" "}
+                            from {editingProduct.ratingCount ?? 0} total ratings
                           </div>
                         </div>
                         <div>
@@ -2055,8 +2396,9 @@ export default function ProductsList() {
                         />
                       </div>
                       <p className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-800">
-                        Manual seed values are editable here. Real customer review scores are read-only
-                        and are merged into the storefront rating automatically.
+                        Manual seed values are editable here. Real customer
+                        review scores are read-only and are merged into the
+                        storefront rating automatically.
                       </p>
                     </div>
                   </section>
@@ -2064,13 +2406,18 @@ export default function ProductsList() {
                   <section className="rounded-3xl border border-slate-200 p-5">
                     <div className="mb-4 flex items-center justify-between">
                       <div>
-                        <h3 className="text-lg font-semibold text-slate-900">Customer reviews</h3>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          Customer reviews
+                        </h3>
                         <p className="text-sm text-slate-500">
-                          Moderate real review visibility without losing the underlying manual seed rating.
+                          Moderate real review visibility without losing the
+                          underlying manual seed rating.
                         </p>
                       </div>
                       {reviewsLoading && (
-                        <span className="text-sm text-slate-400">Loading reviews...</span>
+                        <span className="text-sm text-slate-400">
+                          Loading reviews...
+                        </span>
                       )}
                     </div>
 
@@ -2093,23 +2440,31 @@ export default function ProductsList() {
                                   {Number(review.rating ?? 0).toFixed(1)} stars
                                 </span>
                                 <span className="text-sm font-semibold text-slate-800">
-                                  {review.reviewerNameRaw || review.reviewerName || "Verified buyer"}
+                                  {review.reviewerNameRaw ||
+                                    review.reviewerName ||
+                                    "Verified buyer"}
                                 </span>
                                 <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${review.status === "published"
-                                    ? "bg-emerald-100 text-emerald-700"
-                                    : "bg-slate-200 text-slate-700"
-                                    }`}
+                                  className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+                                    review.status === "published"
+                                      ? "bg-emerald-100 text-emerald-700"
+                                      : "bg-slate-200 text-slate-700"
+                                  }`}
                                 >
-                                  {review.status === "published" ? "Published" : "Hidden"}
+                                  {review.status === "published"
+                                    ? "Published"
+                                    : "Hidden"}
                                 </span>
                               </div>
                               <p className="text-sm leading-6 text-slate-600">
-                                {review.comment?.trim() || "No written comment added."}
+                                {review.comment?.trim() ||
+                                  "No written comment added."}
                               </p>
                               <p className="text-xs text-slate-400">
                                 {review.createdAt
-                                  ? new Date(review.createdAt).toLocaleString("en-IN")
+                                  ? new Date(review.createdAt).toLocaleString(
+                                      "en-IN",
+                                    )
                                   : "Recently added"}
                               </p>
                             </div>
@@ -2119,13 +2474,16 @@ export default function ProductsList() {
                               onClick={() =>
                                 handleReviewStatusToggle(
                                   review._id,
-                                  review.status === "published" ? "hidden" : "published"
+                                  review.status === "published"
+                                    ? "hidden"
+                                    : "published",
                                 )
                               }
-                              className={`rounded-xl px-3 py-2 text-sm font-semibold ${review.status === "published"
-                                ? "bg-slate-900 text-white"
-                                : "bg-emerald-600 text-white"
-                                } disabled:cursor-not-allowed disabled:opacity-60`}
+                              className={`rounded-xl px-3 py-2 text-sm font-semibold ${
+                                review.status === "published"
+                                  ? "bg-slate-900 text-white"
+                                  : "bg-emerald-600 text-white"
+                              } disabled:cursor-not-allowed disabled:opacity-60`}
                             >
                               {reviewStatusLoading === review._id
                                 ? "Updating..."
@@ -2140,21 +2498,27 @@ export default function ProductsList() {
                   </section>
 
                   <section className="rounded-3xl border border-slate-200 p-5">
-                    <h3 className="mb-4 text-lg font-semibold text-slate-900">Inventory and media</h3>
+                    <h3 className="mb-4 text-lg font-semibold text-slate-900">
+                      Inventory and media
+                    </h3>
                     <div className="grid gap-4">
                       <div className="grid gap-3 sm:grid-cols-2">
                         <div>
                           <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                            Stock quantity
+                            Stock & prices
                           </label>
-                          <input
-                            type="number"
-                            min="0"
-                            name="stockQuantity"
-                            value={editingProduct.stockQuantity}
-                            onChange={handleChange}
-                            className={inputClass}
-                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setLocationsProductId(editingProduct._id)
+                            }
+                            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:bg-emerald-100"
+                          >
+                            <MapPin className="h-4 w-4" /> Set per location
+                          </button>
+                          <p className="mt-1 text-xs text-slate-400">
+                            Each location keeps its own stock and selling price.
+                          </p>
                         </div>
                         <div>
                           <label className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -2186,12 +2550,13 @@ export default function ProductsList() {
                           </p>
                         )}
                         <p className="mt-2 text-xs text-slate-400">
-                          Keep, remove, reorder, and add images in one flow. The selected primary image
-                          becomes the storefront cover.
+                          Keep, remove, reorder, and add images in one flow. The
+                          selected primary image becomes the storefront cover.
                         </p>
                       </div>
 
-                      {(editableExistingImages.length > 0 || selectedImages.length > 0) && (
+                      {(editableExistingImages.length > 0 ||
+                        selectedImages.length > 0) && (
                         <div className="space-y-4">
                           {editableExistingImages.length > 0 && (
                             <div>
@@ -2210,11 +2575,13 @@ export default function ProductsList() {
                                         alt="product"
                                         onError={(event) => {
                                           event.currentTarget.onerror = null;
-                                          event.currentTarget.src = DEFAULT_PRODUCT_IMAGE_URL;
+                                          event.currentTarget.src =
+                                            DEFAULT_PRODUCT_IMAGE_URL;
                                         }}
                                         className="h-24 w-full object-cover ring-1 ring-slate-200"
                                       />
-                                      {editingProduct.primaryImage === image && (
+                                      {editingProduct.primaryImage ===
+                                        image && (
                                         <span className="absolute left-2 top-2 rounded-full bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
                                           Primary
                                         </span>
@@ -2224,10 +2591,11 @@ export default function ProductsList() {
                                       <button
                                         type="button"
                                         onClick={() => setPrimaryImage(image)}
-                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image
-                                          ? "bg-emerald-100 text-emerald-700"
-                                          : "bg-slate-100 text-slate-600"
-                                          }`}
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                                          editingProduct.primaryImage === image
+                                            ? "bg-emerald-100 text-emerald-700"
+                                            : "bg-slate-100 text-slate-600"
+                                        }`}
                                       >
                                         {editingProduct.primaryImage === image
                                           ? "Primary"
@@ -2238,15 +2606,22 @@ export default function ProductsList() {
                                           <button
                                             type="button"
                                             disabled={index === 0}
-                                            onClick={() => moveExistingImage(index, -1)}
+                                            onClick={() =>
+                                              moveExistingImage(index, -1)
+                                            }
                                             className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                                           >
                                             <ChevronUpIcon className="h-4 w-4" />
                                           </button>
                                           <button
                                             type="button"
-                                            disabled={index === editableExistingImages.length - 1}
-                                            onClick={() => moveExistingImage(index, 1)}
+                                            disabled={
+                                              index ===
+                                              editableExistingImages.length - 1
+                                            }
+                                            onClick={() =>
+                                              moveExistingImage(index, 1)
+                                            }
                                             className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                                           >
                                             <ChevronDownIcon className="h-4 w-4" />
@@ -2254,7 +2629,9 @@ export default function ProductsList() {
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => removeExistingImage(image)}
+                                          onClick={() =>
+                                            removeExistingImage(image)
+                                          }
                                           className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-600"
                                         >
                                           <TrashIcon className="h-4 w-4" />
@@ -2285,7 +2662,8 @@ export default function ProductsList() {
                                         alt="preview"
                                         className="h-24 w-full object-cover ring-1 ring-slate-200"
                                       />
-                                      {editingProduct.primaryImage === image.id && (
+                                      {editingProduct.primaryImage ===
+                                        image.id && (
                                         <span className="absolute left-2 top-2 rounded-full bg-slate-950 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-white">
                                           Primary
                                         </span>
@@ -2294,13 +2672,18 @@ export default function ProductsList() {
                                     <div className="space-y-2 p-2">
                                       <button
                                         type="button"
-                                        onClick={() => setPrimaryImage(image.id)}
-                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${editingProduct.primaryImage === image.id
-                                          ? "bg-emerald-100 text-emerald-700"
-                                          : "bg-slate-100 text-slate-600"
-                                          }`}
+                                        onClick={() =>
+                                          setPrimaryImage(image.id)
+                                        }
+                                        className={`w-full rounded-lg px-2 py-1 text-[11px] font-semibold ${
+                                          editingProduct.primaryImage ===
+                                          image.id
+                                            ? "bg-emerald-100 text-emerald-700"
+                                            : "bg-slate-100 text-slate-600"
+                                        }`}
                                       >
-                                        {editingProduct.primaryImage === image.id
+                                        {editingProduct.primaryImage ===
+                                        image.id
                                           ? "Primary"
                                           : "Set primary"}
                                       </button>
@@ -2309,15 +2692,22 @@ export default function ProductsList() {
                                           <button
                                             type="button"
                                             disabled={index === 0}
-                                            onClick={() => moveSelectedImage(index, -1)}
+                                            onClick={() =>
+                                              moveSelectedImage(index, -1)
+                                            }
                                             className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                                           >
                                             <ChevronUpIcon className="h-4 w-4" />
                                           </button>
                                           <button
                                             type="button"
-                                            disabled={index === selectedImages.length - 1}
-                                            onClick={() => moveSelectedImage(index, 1)}
+                                            disabled={
+                                              index ===
+                                              selectedImages.length - 1
+                                            }
+                                            onClick={() =>
+                                              moveSelectedImage(index, 1)
+                                            }
                                             className="rounded-lg bg-slate-100 p-1.5 text-slate-600 disabled:cursor-not-allowed disabled:opacity-40"
                                           >
                                             <ChevronDownIcon className="h-4 w-4" />
@@ -2325,7 +2715,9 @@ export default function ProductsList() {
                                         </div>
                                         <button
                                           type="button"
-                                          onClick={() => removeSelectedImage(image.id)}
+                                          onClick={() =>
+                                            removeSelectedImage(image.id)
+                                          }
                                           className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-rose-50 px-2 py-1.5 text-[11px] font-semibold text-rose-600"
                                         >
                                           <TrashIcon className="h-4 w-4" />

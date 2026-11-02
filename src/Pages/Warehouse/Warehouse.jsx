@@ -1,5 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import { Link } from "react-router-dom";
+import { useLocations } from "../../Context/LocationProvider";
+import { idOf } from "../../Api/multicity";
 import {
   createWarehouse,
   deleteWarehouse,
@@ -26,7 +29,15 @@ const emptyLocation = () => ({
   lng: "",
 });
 
+// Backend rejects warehouses in paused/inactive cities.
+const BLOCKED_CITY_STATUSES = ["paused", "inactive"];
+
 const initialFormState = {
+  stateId: "",
+  cityId: "",
+  // Kept only so edits/toggles send the stored values back unchanged.
+  zoneId: "",
+  capacity: null,
   name: "",
   fullAddress: "",
   status: "open",
@@ -61,6 +72,11 @@ const parseMapLinkCoordinates = (url = "") => {
 };
 
 const toPayload = (form) => ({
+  stateId: form.stateId,
+  cityId: form.cityId,
+  ...(form.zoneId ? { zoneId: form.zoneId } : {}),
+  // Backend resets capacity to 0 when it is missing, so resend stored values.
+  ...(form.capacity ? { capacity: form.capacity } : {}),
   name: form.name.trim(),
   fullAddress: form.fullAddress.trim(),
   status: form.status,
@@ -77,6 +93,22 @@ const toPayload = (form) => ({
 });
 
 const normalizeWarehouseForEdit = (warehouse) => ({
+  stateId: idOf(warehouse?.stateId),
+  cityId: idOf(warehouse?.cityId),
+  // Names from the populated warehouse, shown when state/city are locked.
+  // (Warehouse managers cannot list states/cities, so the selects would be empty.)
+  stateLabel: warehouse?.stateId?.name || "",
+  cityLabel: warehouse?.cityId?.name || "",
+  zoneId: idOf(warehouse?.zoneId),
+  capacity: warehouse?.capacity
+    ? {
+        maxActiveOrders: Number(warehouse.capacity.maxActiveOrders || 0),
+        maxDrivers: Number(warehouse.capacity.maxDrivers || 0),
+        maxConcurrentDeliveries: Number(
+          warehouse.capacity.maxConcurrentDeliveries || 0,
+        ),
+      }
+    : null,
   name: warehouse?.name || "",
   fullAddress: warehouse?.fullAddress || "",
   status: warehouse?.status || "open",
@@ -103,6 +135,14 @@ const normalizeWarehouseForEdit = (warehouse) => ({
 });
 
 const validateForm = (form) => {
+  if (!form.stateId) {
+    return "Please select a state";
+  }
+
+  if (!form.cityId) {
+    return "Please select a city";
+  }
+
   if (!form.name.trim()) {
     return "Warehouse name is required";
   }
@@ -135,6 +175,13 @@ const validateForm = (form) => {
 };
 
 export default function Warehouse() {
+  const {
+    states,
+    citiesOfState,
+    stateName,
+    cityName,
+    refresh: refreshLocations,
+  } = useLocations();
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -142,10 +189,27 @@ export default function Warehouse() {
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm] = useState(initialFormState);
   const [editingWarehouseId, setEditingWarehouseId] = useState(null);
+  // State/city can only be set on create, or on a legacy warehouse that has
+  // none yet. Moving an existing warehouse uses Locations → Warehouses → Move.
+  const [hierarchyLocked, setHierarchyLocked] = useState(false);
+
+  const activeStates = useMemo(
+    () => states.filter((state) => state.status !== "inactive"),
+    [states],
+  );
+
+  const cityOptions = useMemo(() => {
+    if (!form.stateId) return [];
+    return citiesOfState(form.stateId).filter(
+      (city) =>
+        !BLOCKED_CITY_STATUSES.includes(city.status) ||
+        idOf(city._id) === form.cityId,
+    );
+  }, [form.stateId, form.cityId, citiesOfState]);
 
   const formTitle = useMemo(
     () => (editingWarehouseId ? "Edit Warehouse" : "Add Warehouse"),
-    [editingWarehouseId]
+    [editingWarehouseId],
   );
 
   const loadWarehouses = async () => {
@@ -158,7 +222,7 @@ export default function Warehouse() {
       }
 
       setWarehouses(response?.warehouses || response?.data?.warehouses || []);
-    } catch (error) {
+    } catch {
       toast.error("Failed to fetch warehouses");
     } finally {
       setLoading(false);
@@ -172,12 +236,14 @@ export default function Warehouse() {
   const resetForm = () => {
     setForm(initialFormState);
     setEditingWarehouseId(null);
+    setHierarchyLocked(false);
     setFormOpen(false);
   };
 
   const openCreateForm = () => {
     setForm(initialFormState);
     setEditingWarehouseId(null);
+    setHierarchyLocked(false);
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -213,7 +279,7 @@ export default function Warehouse() {
         updateLocation("lng", String(position.coords.longitude));
         toast.success("Current location added");
       },
-      () => toast.error("Unable to fetch current location")
+      () => toast.error("Unable to fetch current location"),
     );
   };
 
@@ -241,12 +307,15 @@ export default function Warehouse() {
       toast.success(
         editingWarehouseId
           ? "Warehouse updated successfully"
-          : "Warehouse created successfully"
+          : "Warehouse created successfully",
       );
 
       resetForm();
       await loadWarehouses();
-    } catch (error) {
+      // Keep the shared State → City → Warehouse lists (zones, inventory,
+      // admin scope pickers) in sync with the new warehouse.
+      refreshLocations();
+    } catch {
       toast.error("Failed to save warehouse");
     } finally {
       setSubmitting(false);
@@ -254,15 +323,17 @@ export default function Warehouse() {
   };
 
   const handleEdit = (warehouse) => {
+    const normalized = normalizeWarehouseForEdit(warehouse);
     setEditingWarehouseId(warehouse._id);
-    setForm(normalizeWarehouseForEdit(warehouse));
+    setHierarchyLocked(Boolean(normalized.stateId && normalized.cityId));
+    setForm(normalized);
     setFormOpen(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (warehouseId) => {
     const shouldDelete = window.confirm(
-      "Are you sure you want to delete this warehouse?"
+      "Close this warehouse? It will stop serving orders. Inventory and order history are kept.",
     );
     if (!shouldDelete) return;
 
@@ -272,7 +343,8 @@ export default function Warehouse() {
       return;
     }
 
-    toast.success("Warehouse deleted successfully");
+    toast.success("Warehouse closed");
+    refreshLocations();
     if (editingWarehouseId === warehouseId) {
       resetForm();
     }
@@ -282,34 +354,23 @@ export default function Warehouse() {
   const handleStatusToggle = async (warehouse) => {
     const nextStatus = warehouse.status === "open" ? "close" : "open";
 
+    if (!idOf(warehouse.stateId) || !idOf(warehouse.cityId)) {
+      toast.error("Assign a state and city first (click Edit)");
+      return;
+    }
+
     try {
       setStatusUpdatingId(warehouse._id);
 
-      const response = await updateWarehouse(warehouse._id, {
-        name: warehouse.name,
-        fullAddress: warehouse.fullAddress || "",
-        status: nextStatus,
-        serviceArea: {
-          deliveryRadiusKm: Number(warehouse?.serviceArea?.deliveryRadiusKm || 0),
-          selfPickupRadiusKm: Number(
-            warehouse?.serviceArea?.selfPickupRadiusKm || 0
-          ),
-        },
-        location: {
-          optionType: warehouse.location?.optionType,
-          mapLink: warehouse.location?.mapLink || "",
-          lat:
-            Array.isArray(warehouse?.location?.location?.coordinates) &&
-            warehouse.location.location.coordinates.length === 2
-              ? warehouse.location.location.coordinates[1]
-              : undefined,
-          lng:
-            Array.isArray(warehouse?.location?.location?.coordinates) &&
-            warehouse.location.location.coordinates.length === 2
-              ? warehouse.location.location.coordinates[0]
-              : undefined,
-        },
-      });
+      // Resend the stored hierarchy, capacity and location; the update
+      // endpoint revalidates the full payload.
+      const response = await updateWarehouse(
+        warehouse._id,
+        toPayload({
+          ...normalizeWarehouseForEdit(warehouse),
+          status: nextStatus,
+        }),
+      );
 
       if (response?.ok === false || response?.success === false) {
         toast.error(response?.message || "Failed to update warehouse status");
@@ -318,8 +379,8 @@ export default function Warehouse() {
 
       setWarehouses((current) =>
         current.map((item) =>
-          item._id === warehouse._id ? { ...item, status: nextStatus } : item
-        )
+          item._id === warehouse._id ? { ...item, status: nextStatus } : item,
+        ),
       );
 
       if (editingWarehouseId === warehouse._id) {
@@ -327,7 +388,7 @@ export default function Warehouse() {
       }
 
       toast.success(`Warehouse marked as ${nextStatus}`);
-    } catch (error) {
+    } catch {
       toast.error("Failed to update warehouse status");
     } finally {
       setStatusUpdatingId(null);
@@ -343,7 +404,8 @@ export default function Warehouse() {
             Warehouses
           </h1>
           <p className="mt-1 text-sm text-slate-600">
-            List all warehouses, toggle open or close, and add new warehouses from one screen.
+            List all warehouses, toggle open or close, and add new warehouses
+            from one screen.
           </p>
         </div>
 
@@ -371,9 +433,12 @@ export default function Warehouse() {
         <div className="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">{formTitle}</h2>
+              <h2 className="text-lg font-semibold text-slate-900">
+                {formTitle}
+              </h2>
               <p className="text-sm text-slate-500">
-                Save one location per warehouse using current location, pinpoint, or a Google Maps link.
+                Save one location per warehouse using current location,
+                pinpoint, or a Google Maps link.
               </p>
             </div>
 
@@ -388,7 +453,113 @@ export default function Warehouse() {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {activeStates.length === 0 && !hierarchyLocked ? (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                No states or cities yet. Create a state and a city first in{" "}
+                <Link
+                  to="/locations/cities"
+                  className="font-semibold underline"
+                >
+                  Locations → Cities &amp; States
+                </Link>
+                , then come back to add the warehouse.
+              </div>
+            ) : null}
+
             <div className="grid gap-4 md:grid-cols-2">
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">
+                  State <span className="text-red-500">*</span>
+                </span>
+                {hierarchyLocked ? (
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={form.stateLabel || stateName(form.stateId)}
+                    className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-slate-500"
+                  />
+                ) : (
+                  <select
+                    value={form.stateId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        stateId: event.target.value,
+                        // City belongs to a state, so clear it on state change.
+                        cityId: "",
+                      }))
+                    }
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    <option value="">Select state</option>
+                    {activeStates.map((state) => (
+                      <option key={idOf(state._id)} value={idOf(state._id)}>
+                        {state.name}
+                        {state.code ? ` (${state.code})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-medium text-slate-700">
+                  City <span className="text-red-500">*</span>
+                </span>
+                {hierarchyLocked ? (
+                  <input
+                    type="text"
+                    readOnly
+                    disabled
+                    value={form.cityLabel || cityName(form.cityId)}
+                    className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2.5 text-slate-500"
+                  />
+                ) : (
+                  <select
+                    value={form.cityId}
+                    disabled={!form.stateId}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        cityId: event.target.value,
+                      }))
+                    }
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-500"
+                  >
+                    <option value="">
+                      {!form.stateId
+                        ? "Select a state first"
+                        : cityOptions.length === 0
+                          ? "No active city in this state"
+                          : "Select city"}
+                    </option>
+                    {cityOptions.map((city) => (
+                      <option key={idOf(city._id)} value={idOf(city._id)}>
+                        {city.name}
+                        {city.status
+                          ? ` (${city.status.replace(/_/g, " ")})`
+                          : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </label>
+
+              {hierarchyLocked ? (
+                <p className="text-xs text-slate-500 md:col-span-2">
+                  State and city can't be changed here. To move this warehouse,
+                  use{" "}
+                  <Link
+                    to="/locations/warehouses"
+                    className="font-medium text-blue-600 underline"
+                  >
+                    Locations → Warehouses → Move
+                  </Link>
+                  .
+                </p>
+              ) : null}
+
               <label className="block">
                 <span className="mb-1 block text-sm font-medium text-slate-700">
                   Warehouse Name
@@ -397,7 +568,10 @@ export default function Warehouse() {
                   type="text"
                   value={form.name}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, name: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
                   }
                   placeholder="Enter warehouse name"
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
@@ -429,7 +603,10 @@ export default function Warehouse() {
                 <select
                   value={form.status}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, status: event.target.value }))
+                    setForm((current) => ({
+                      ...current,
+                      status: event.target.value,
+                    }))
                   }
                   className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
                 >
@@ -493,7 +670,9 @@ export default function Warehouse() {
                   </span>
                   <select
                     value={form.location.optionType}
-                    onChange={(event) => updateLocation("optionType", event.target.value)}
+                    onChange={(event) =>
+                      updateLocation("optionType", event.target.value)
+                    }
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
                   >
                     {LOCATION_TYPE_OPTIONS.map((option) => (
@@ -525,7 +704,9 @@ export default function Warehouse() {
                   <input
                     type="url"
                     value={form.location.mapLink}
-                    onChange={(event) => updateLocation("mapLink", event.target.value)}
+                    onChange={(event) =>
+                      updateLocation("mapLink", event.target.value)
+                    }
                     placeholder="https://maps.google.com/..."
                     className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
                   />
@@ -541,7 +722,9 @@ export default function Warehouse() {
                       type="number"
                       step="any"
                       value={form.location.lat}
-                      onChange={(event) => updateLocation("lat", event.target.value)}
+                      onChange={(event) =>
+                        updateLocation("lat", event.target.value)
+                      }
                       placeholder="Latitude"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
                     />
@@ -556,7 +739,9 @@ export default function Warehouse() {
                       type="number"
                       step="any"
                       value={form.location.lng}
-                      onChange={(event) => updateLocation("lng", event.target.value)}
+                      onChange={(event) =>
+                        updateLocation("lng", event.target.value)
+                      }
                       placeholder="Longitude"
                       className="w-full rounded-lg border border-slate-300 px-3 py-2.5 outline-none transition focus:border-blue-500"
                     />
@@ -583,9 +768,12 @@ export default function Warehouse() {
       <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Warehouse List</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              Warehouse List
+            </h2>
             <p className="text-sm text-slate-500">
-              Review all warehouses and quickly toggle their open or close status.
+              Review all warehouses and quickly toggle their open or close
+              status.
             </p>
           </div>
 
@@ -601,12 +789,16 @@ export default function Warehouse() {
         ) : warehouses.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 py-16 text-center">
             <WarehouseIcon className="mx-auto h-10 w-10 text-slate-300" />
-            <p className="mt-3 text-sm text-slate-500">No warehouses added yet.</p>
+            <p className="mt-3 text-sm text-slate-500">
+              No warehouses added yet.
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
             {warehouses.map((warehouse) => {
-              const coordinates = Array.isArray(warehouse?.location?.location?.coordinates)
+              const coordinates = Array.isArray(
+                warehouse?.location?.location?.coordinates,
+              )
                 ? warehouse.location.location.coordinates
                 : [];
 
@@ -631,6 +823,22 @@ export default function Warehouse() {
                           {warehouse.status}
                         </span>
                       </div>
+
+                      <p className="mt-1 text-sm text-slate-600">
+                        {idOf(warehouse.cityId) ? (
+                          <>
+                            {warehouse.cityId?.name ||
+                              cityName(warehouse.cityId)}
+                            ,{" "}
+                            {warehouse.stateId?.name ||
+                              stateName(warehouse.stateId)}
+                          </>
+                        ) : (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                            No state/city assigned. Click Edit to assign
+                          </span>
+                        )}
+                      </p>
 
                       <p className="mt-1 text-xs text-slate-500">
                         Created {new Date(warehouse.createdAt).toLocaleString()}
@@ -696,22 +904,32 @@ export default function Warehouse() {
 
                   <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
                     <div className="mb-2 rounded-lg bg-white px-3 py-2 text-sm text-slate-700">
-                      <span className="font-semibold text-slate-900">Address:</span>{" "}
+                      <span className="font-semibold text-slate-900">
+                        Address:
+                      </span>{" "}
                       {warehouse.fullAddress || "Not provided"}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
-                        {(warehouse.location?.optionType || "location").replaceAll("_", " ")}
+                        {(
+                          warehouse.location?.optionType || "location"
+                        ).replaceAll("_", " ")}
                       </span>
                     </div>
 
                     <div className="mt-2 flex flex-col gap-1">
                       <span>
-                        Delivery radius: {Number(warehouse?.serviceArea?.deliveryRadiusKm || 0)} km
+                        Delivery radius:{" "}
+                        {Number(warehouse?.serviceArea?.deliveryRadiusKm || 0)}{" "}
+                        km
                       </span>
                       <span>
-                        Self pickup radius: {Number(warehouse?.serviceArea?.selfPickupRadiusKm || 0)} km
+                        Self pickup radius:{" "}
+                        {Number(
+                          warehouse?.serviceArea?.selfPickupRadiusKm || 0,
+                        )}{" "}
+                        km
                       </span>
                       {coordinates.length === 2 ? (
                         <span>

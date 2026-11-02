@@ -12,7 +12,10 @@ const AdminListPage = () => {
     try {
       const res = await AdminList();
       if (res?.ok !== false) {
-        setAdmins(res.data || res);
+        // Backend now returns { success, admins }; keep array support for
+        // older deployments.
+        const payload = res.data ?? res;
+        setAdmins(Array.isArray(payload) ? payload : payload?.admins || []);
       }
     } finally {
       setLoading(false);
